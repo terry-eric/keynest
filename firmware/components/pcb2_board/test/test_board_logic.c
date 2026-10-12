@@ -35,6 +35,20 @@ TEST_CASE("Brightness keeps colors recoverable and boundaries exact", "[pcb2]") 
     TEST_ASSERT_EQUAL_UINT8(128, pcb2_scale_color(128, 255));
 }
 
+TEST_CASE("Microphone model selects the driven slot and retains signed PCM", "[pcb2]") {
+    const int32_t frames[][2] = {
+        {0x0123457f, (int32_t)0xfedcba80u},
+        {INT32_MAX, INT32_MIN},
+        {0x000000ff, -1}
+    };
+    const int32_t left[] = {0x012345, 8388607, 0};
+    const int32_t right[] = {-0x012346, -8388608, -1};
+    for (unsigned i = 0; i < 3; ++i) {
+        TEST_ASSERT_EQUAL_INT32(left[i], pcb2_stereo_to_pcm24(frames[i], false));
+        TEST_ASSERT_EQUAL_INT32(right[i], pcb2_stereo_to_pcm24(frames[i], true));
+    }
+}
+
 TEST_CASE("Uninitialized peripherals and invalid buffers fail clearly", "[pcb2]") {
     int32_t input[1]; int16_t output[1]; size_t count = 99;
     TEST_ASSERT_EQUAL(ESP_ERR_INVALID_ARG, pcb2_audio_read(NULL, 1, &count, 0));

@@ -239,7 +239,7 @@ def main():
                 if self.command == "GET" and path in ("/api/audio", "/api/recording.wav"):
                     pcm, headers = device.request(path, headers={"X-PCB2-Recording": self.headers.get("X-PCB2-Recording", "")})
                     return self.reply(200, pcm, headers)
-                if self.command == "POST" and path in ("/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/preview/close"):
+                if self.command == "POST" and path in ("/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/microphone/channel", "/api/preview/close"):
                     if self.headers.get("X-PCB2-Control") != "1":
                         return self.reply(403, b'{"error":"Missing control header"}', {"Content-Type": "application/json"})
                     size = int(self.headers.get("Content-Length", "0"))

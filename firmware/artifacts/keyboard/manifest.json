@@ -11,7 +11,7 @@
     "capture_seconds": 2.048
   },
   "esptool_checksum_and_hash_validated": true,
-  "physically_run": false,
+  "physically_run": true,
   "files": [
     {
       "path": "bootloader.bin",
@@ -27,14 +27,14 @@
     },
     {
       "path": "firmware.bin",
-      "bytes": 1061680,
-      "sha256": "2938652980fdcfcd753024805e76d16d4946e9ceec03a2cd143f995fdccfad86",
+      "bytes": 1063920,
+      "sha256": "dddb7bafbaa0bfb4e47fa625e7cbc07043a01c68135b165b75801b012e15d3cc",
       "flash_offset": "0x10000"
     },
     {
       "path": "firmware.elf",
-      "bytes": 10823800,
-      "sha256": "268e227d379e2469f5453964dd0054f84254458e233e80260327180020ac043c"
+      "bytes": 10833984,
+      "sha256": "46899c0226a52a391db7a3d8e306f81b07b5cd89c185dbdba2bd75cb584125f3"
     }
   ],
   "sources": [
@@ -43,8 +43,12 @@
       "sha256": "c157964bfe404b3860f56933306fd5966abce479644ef57efc05df7edf0ce35d"
     },
     {
+      "path": "firmware/components/pcb2_board/Kconfig",
+      "sha256": "a812e9835a8ca4c48d2147adbe9c071c346a2c7e4ba94237103af43ddea528bb"
+    },
+    {
       "path": "firmware/components/pcb2_board/audio.c",
-      "sha256": "40e49e698955ffe3a0833a0e1637b1196740fdb4f32fdd3f5bca46502f169fe9"
+      "sha256": "f6328ce97eebf7edff8771577172cd191f0665ea0a5f47240eff85ae2741d2fa"
     },
     {
       "path": "firmware/components/pcb2_board/board.c",
@@ -52,7 +56,7 @@
     },
     {
       "path": "firmware/components/pcb2_board/board_logic.h",
-      "sha256": "9172a633f43ea094b518b64a7d22e33b2d1699cb8877d9d8a2b78be153cedb0c"
+      "sha256": "a83663cf5a4673464008943b11e4ba11b6ec48b91d2fbb8d02b8ef61401dde76"
     },
     {
       "path": "firmware/components/pcb2_board/idf_component.yml",
@@ -60,7 +64,7 @@
     },
     {
       "path": "firmware/components/pcb2_board/include/pcb2_board.h",
-      "sha256": "02db8be317b20d3ece494f8d7e351cae71807d6fa14f86fe84f22de3cf5a07f2"
+      "sha256": "684b5bf614269d90d863a9c92f90ebc6fbc6906bfc827432b7d246c6fa095447"
     },
     {
       "path": "firmware/components/pcb2_board/include/pcb2_pins.h",
@@ -76,7 +80,7 @@
     },
     {
       "path": "firmware/components/pcb2_board/test/test_board_logic.c",
-      "sha256": "a4e48346b9e45415984a04fda9565c7ff9046804b8dd5e09e7959479070ff5ca"
+      "sha256": "4050df621384259625d86330d925354c03914a1e89f263b38a0b22cfb94fa278"
     },
     {
       "path": "firmware/keyboard/CMakeLists.txt",
@@ -160,11 +164,11 @@
     },
     {
       "path": "firmware/keyboard/main/web/app.js",
-      "sha256": "62032e72f21a7627dc8a0df1331a0f7514e840f4dfd5cb99983fd722ca018f12"
+      "sha256": "8583e55da1e35ffc33340a9cc3ab320f8b58e917afb2f4a8b9d938af5cc4aed9"
     },
     {
       "path": "firmware/keyboard/main/web/index.html",
-      "sha256": "239abb521bf709098b7fd51b84a0e6f8681e84b2f6a24c56dacdf55afef2a37d"
+      "sha256": "122f441b021013d668bdc23ba768bbe3db4b57cbd1cdbb145bf6388ae4f368cd"
     },
     {
       "path": "firmware/keyboard/main/web/style.css",
@@ -172,7 +176,7 @@
     },
     {
       "path": "firmware/keyboard/main/web_server.c",
-      "sha256": "296859b890cd24154e2655e686def67b832249cf3b4c28a335409c02291808d8"
+      "sha256": "2add08b37fee131f3fa0006e07a504d41217637c72f70e660c11ffc6be414587"
     },
     {
       "path": "firmware/keyboard/partitions.csv",
@@ -184,7 +188,32 @@
     },
     {
       "path": "firmware/keyboard/sdkconfig.defaults",
-      "sha256": "be4d3cde0a5a1148206571e1b5a84a4acb48519436837de4c95bd44d80e733cf"
+      "sha256": "ad19fcec1346cac15f27991920b2b4c7e53b5b8259fb7aab227b474fe6e7840a"
     }
-  ]
+  ],
+  "microphone": {
+    "model": "ZTS6672",
+    "startup_slot": "left",
+    "runtime_slot_selection": true,
+    "startup_ms": 50
+  },
+  "runtime_validation": "Diagnostic app flashed and independently verified; USB HID/CDC, web slot control and live PCM passed. Left is nonzero, right is all zero. Speech response remains unconfirmed.",
+  "runtime_checks": {
+    "date": "2026-10-13",
+    "app_offset": "0x10000",
+    "app_verified": true,
+    "settings_preserved": true,
+    "flash_recording_preserved": true,
+    "transport": "usb",
+    "pc_wifi_changed": false,
+    "slot_control_via_web": true,
+    "right_zero_windows": 20,
+    "left_unique_windows": 20,
+    "max_pcm_age_ms": 2,
+    "recording_frames": 320512,
+    "recording_seconds": 20.032,
+    "recording_dropped_frames": 0,
+    "recording_clipped_frames": 0,
+    "speech_response_passed": false
+  }
 }

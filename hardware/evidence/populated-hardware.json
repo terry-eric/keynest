@@ -1,0 +1,36 @@
+{
+  "reported_at": "2026-10-13",
+  "source": "User confirmed populated U10 is ZTS6672",
+  "design_snapshot_part": "ICS-43434",
+  "populated_part": "ZTS6672",
+  "datasheet": {
+    "title": "ZillTek ZTS6672 DS-13",
+    "url": "https://www.denovocn.com/sites/default/files/ZTS6672.pdf",
+    "sha256": "9ed6b1ca488483b6535cb8901d3dbf331446c7bb7f9b9a627e7c9a276ec7e34a",
+    "configuration_page": 6
+  },
+  "datasheet_i2s_selection": {
+    "config": "open",
+    "select_low": "right",
+    "select_high": "left"
+  },
+  "pcb_pin_2_net": "GND",
+  "physical_config_pin_verified": false,
+  "physical_acoustic_port_verified": false,
+  "note": "Schematic metadata is retained as historical evidence. Actual CONFIG connection and manufactured acoustic hole have not been inspected.",
+  "measured_slots": {
+    "left": "nonzero, large DC and weak speech reported",
+    "right": "all-zero PCM in 40 windows on right-only build"
+  },
+  "selection_discrepancy": "DS-13 SELECT-low table says right; actual pin state/mode or document interpretation not yet verified.",
+  "diagnostic_validation": {
+    "date": "2026-10-13",
+    "startup_slot": "left",
+    "gain": 8,
+    "runtime_slot_control_verified": true,
+    "quiet_median_ac_dbfs": -66.77,
+    "speech_window_median_ac_dbfs": -66.98,
+    "speech_response_passed": false,
+    "note": "20.032-second local WAV has no dropped or clipped samples. Physical acoustic path and actual CONFIG/SELECT remain unverified."
+  }
+}

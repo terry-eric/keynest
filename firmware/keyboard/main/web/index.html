@@ -26,6 +26,7 @@
       <div class="mic-diagnostics"><span>原始音量 <strong id="mic-raw">—</strong> dBFS</span><span>直流偏移 <strong id="mic-dc">—</strong> PCM</span><span>峰值 <strong id="mic-ac-peak">—</strong> dBFS</span></div>
       <p class="caption monitor-note" id="monitor-note" role="status">開始後可觀察說話或拍手的反應。監測不保存錄音，不需要 SD 卡。</p>
       <label class="range-label" for="mic-gain">收音增益 <output id="gain-value">2×</output></label><input id="mic-gain" type="range" min="1" max="16" value="2"><p class="caption">增益過高會削波。音量為 dBFS，並非校準的環境分貝。</p>
+      <label class="field-label" for="mic-channel">收音聲道診斷</label><select id="mic-channel"><option value="left">左聲道</option><option value="right">右聲道</option></select><p class="caption" id="mic-channel-note">錄音停止後可切換。這是暫時設定，重啟會恢復預設聲道。</p>
     </section>
     <section class="panel"><div class="panel-head"><div><span class="section-number">03</span><h2>LED 樣態</h2></div><span class="mini-label">4 × RGB</span></div>
       <div class="patterns" role="group" aria-label="LED 樣態"><button data-mode="0">○<span>關閉</span></button><button data-mode="1">●<span>常亮</span></button><button data-mode="2">◉<span>呼吸</span></button><button data-mode="3">◒<span>彩虹</span></button><button data-mode="4" class="selected">◎<span>按鍵漣漪</span></button><button data-mode="5">▥<span>隨音律動</span></button></div>

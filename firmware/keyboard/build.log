@@ -25,16 +25,15 @@ Found 0 compatible libraries
 Scanning dependencies...
 No dependencies
 Building in release mode
-Generating assembly for .pio\build\pcb2_s3\index.html.S
 Generating assembly for .pio\build\pcb2_s3\app.js.S
+Compiling .pio\build\pcb2_s3\main\web_server.c.o
 Compiling .pio\build\pcb2_s3\.pio\build\pcb2_s3\app.js.S.o
-Compiling .pio\build\pcb2_s3\.pio\build\pcb2_s3\index.html.S.o
 Linking .pio\build\pcb2_s3\firmware.elf
 Retrieving maximum program size .pio\build\pcb2_s3\firmware.elf
 Checking size .pio\build\pcb2_s3\firmware.elf
 Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
-RAM:   [==        ]  20.4% (used 66932 bytes from 327680 bytes)
-Flash: [=====     ]  50.6% (used 1061281 bytes from 2097152 bytes)
+RAM:   [==        ]  20.4% (used 67004 bytes from 327680 bytes)
+Flash: [=====     ]  50.7% (used 1063521 bytes from 2097152 bytes)
 Building .pio\build\pcb2_s3\firmware.bin with action:
   "$PYTHONEXE" "$OBJCOPY" --chip esp32s3 elf2image --flash_mode ${__get_board_flash_mode(__env__)} --flash_freq ${__get_board_f_image(__env__)} --flash_size 4MB --elf-sha256-offset 0xb0 -o $TARGET $SOURCES
 Building .pio\build\pcb2_s3\firmware.bin
@@ -42,6 +41,6 @@ esptool.py v4.9.0
 Creating esp32s3 image...
 Merged 2 ELF sections
 Successfully created esp32s3 image.
-========================= [SUCCESS] Took 7.16 seconds =========================
+========================= [SUCCESS] Took 36.58 seconds =========================
 Artifacts: C:\Users\user\Documents\ChatGPT\PCB 2\firmware\artifacts\keyboard
 Staged build: C:\Users\user\AppData\Local\Temp\pcb2-espidf-01a10781\firmware\keyboard

@@ -2,7 +2,9 @@
 
 這個應用使用專案的 `pcb2_board` component，整合 USB HID 鍵盤、四顆 RGB LED、喇叭音效、麥克風音量與 WAV 錄音。Web App 直接放在韌體中，由 ESP32-S3 提供；連到裝置 Wi-Fi 即可操作，無需網際網路或 SD 卡。
 
-目前已完成 ESP-IDF 5.5.0 交叉編譯與軟體驗證。2026-10-13 以板子上既有韌體實測麥克風取樣與瀏覽器串流；收音品質尚未通過。新增 USB 控制與即時波形的實機驗證狀態見 [VALIDATION.md](VALIDATION.md)。接腳沿用 2026-09-19 EasyEDA 保存快照，詳細對照見 [board library](../README.md)。
+目前已完成 ESP-IDF 5.5.0 交叉編譯與軟體驗證。2026-10-13 USB 診斷版已燒錄並核對，實測網頁控制、左右 slot 切換、即時 PCM 波形與免 SD 的 WAV 串流；人聲收音品質尚未通過。實機結果見 [VALIDATION.md](VALIDATION.md)。接腳沿用 2026-09-19 EasyEDA 保存快照，詳細對照見 [board library](../README.md)。
+
+**實際麥克風為 ZTS6672**（使用者於 2026-10-13 確認）。規格書的 CONFIG-open／SELECT-low 表格寫右聲道，但本板右 slot 實測全零；目前預設讀有資料的左 slot，收音品質仍待確認。`menuconfig → PCB2 board` 可選型號及開機聲道，網頁「收音聲道診斷」可在停止錄音後暫時切換，重啟恢復預設。`/api/state` 的 `mic_model` 是建置標示，`mic_slot` 是目前選擇；`mic_slots` 是最近 DMA block 的雙聲道原始統計。
 
 ## 編譯、燒錄與開啟
 
@@ -204,3 +206,7 @@ python -m http.server 8027 --bind 127.0.0.1 --directory firmware/keyboard/main/w
 請求是 `PCB2? ` 後接單行 JSON（`id`、`path`、選用的 `body`），以 LF 結束；最多 1699 bytes，不含 LF。回應是 `PCB2_RPC ` 後接 JSON，含 `id`、`protocol:1`、`status` 和 `data`／`error`。介面使用 DTR=true、RTS=false；不要同時使用串列監看工具占用埠。
 
 狀態與設定命令沿用上述 `/api/` 路徑。麥克風與瀏覽器錄音資料以 Base64 編碼 PCM，附 `bytes`、標準 CRC32 和樣本 metadata；接收端拒絕長度、CRC 或過期資訊不符的音訊。裝置檔案下載使用 `/api/file/begin`、`read`、`end`；2 秒沒有新讀取會釋放下載 session。傳輸出錯不自動重送有副作用的控制命令，以免重複觸發或錄音。
+
+### 麥克風聲道診斷
+
+`POST /api/microphone/channel`：`{"slot":"left"}` 或 `{"slot":"right"}`，HTTP 與 USB 均可用。未知欄位、重複欄位或其他值拒絕；錄音中回覆 409。切換不改 gain、I2S 時鐘、NS4168 輸出或 NVS。`mic_slots` 的 AC dBFS 未乘數位增益，與網頁的 16 kHz／增益後音量不可直接比較。規格書表格與本板訊號不一致，須以實測及腳位檢查判斷，不能只看料號推定。

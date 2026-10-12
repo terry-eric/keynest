@@ -2,13 +2,26 @@
 
 日期：2026-10-05。此紀錄區分實際交叉編譯、主機軟體測試、Web 展示模式與待實機驗證項目。
 
+## 2026-10-13：實機 USB 與 ZTS6672 診斷
+
+- USB 控制版本已在 ESP32-S3 上實際燒錄並獨立 `verify_flash` 成功；只寫 factory app 的 `0x10000`，完整 4 MB 原 Flash 已備份到本機。設定區與錄音區在燒錄前後逐 byte 相同。USB HID + CDC 枚舉成功，音量、PCM 波形、增益調整及 NVS 保存有實際回應；電腦保持原 Wi-Fi。
+- USB 原生監測與瀏覽器 RAM 錄音可同時執行；約 26 秒 WAV 為 16 kHz mono PCM16、415,616 frames，dropped frames 為 0。音訊只保存在本機，不上傳 GitHub。
+- 左 slot、gain 8 的 50 個視窗均不同；AC RMS 中位數 −65.90 dBFS、最高 −36.48 dBFS、age ≤2 ms，沒有削波。聲源沒有校準，這些數字**不代表人聲收音通過**。使用者回報下載 WAV 只有吹氣明顯。
+- 使用者確認實際 U10 是 **ZTS6672**。ZillTek DS-13 第 6 頁表格的 CONFIG-open／SELECT-low 對應 right；實際右聲道專用建置燒錄後，40 個 16 kHz PCM 視窗全部為 0，age ≤2 ms。不能把 datasheet 表格推定當成實機成功。
+- 診斷版增加可暫時切換 left／right 的 HTTP／USB 命令和網頁控制、雙 slot 增益前原始統計；重啟預設 left，避免留在已測得全零的 right。錄音中不允許聲道切換。資料對齊仍使用 Philips、32-bit stereo slots、24-bit signed PCM；啟動等待改為 50 ms。
+- 診斷版已燒錄到 `0x10000`，獨立 `verify_flash` 成功，app SHA-256 為 `dddb7bafbaa0bfb4e47fa625e7cbc07043a01c68135b165b75801b012e15d3cc`；設定區與錄音區仍逐 byte 相同。USB HID／CDC 與音訊初始化成功，開機 left、gain 8。
+- 從網頁切換 right／left 後，API 確認實際裝置的 slot 跟著改變。本機 USB 預覽漏掉的 channel POST 轉送已補上。各 20 個 PCM 視窗確認 right 全零、left 全部不同、age ≤2 ms，最後恢復 left。無效 slot、缺少 slot、未知欄位、重複欄位皆回覆 400；缺少控制 header 回覆 403。USB 主機解析會在轉送前拒絕重複欄位，避免 JSON 解碼將無效命令改成有效命令。
+- 使用者確認開始後取得 20.032 秒本機 WAV：16 kHz mono PCM16、320,512 frames，與裝置計數一致，dropped frames 0、削波 0。測試前 5 秒安靜，約第 10 秒提示連續說話；安靜部分的 250 ms AC RMS 中位數 −66.77 dBFS，後 15 秒中位數 −66.98 dBFS，沒有明顯人聲反應。錄音期間嘗試切換聲道回覆 409。**人聲收音品質仍未通過；USB 傳輸正常不能代替聲學驗證。** WAV 與逐視窗資料只保存在本機。
+- 主機 slot 選擇測試包含不同正負值、連續 frame、PCM24 endpoints 與低 8 位雜訊。Web PCM／WAV 測試、語法與交叉編譯通過；USB transport 12 個測試與相容預覽 5 個測試通過。診斷版 app 1,063,521 bytes、image 1,063,920 bytes，靜態 RAM 67,004 bytes。
+- CONFIG／SELECT 的實際焊接、PCB 實際貫穿收音孔、焊錫或外殼遮擋仍未驗證。2026-10-12 保存的 U10 footprint 有 Multi-Layer 圓形 FILL，沒有獨立 HOLE record；這不足以證明製造鑽孔存在。沒有即時 PCB MCP 連線，因此沒有修改 PCB 或宣稱最新實板與快照一致。
+
 ## 2026-10-13：USB 控制與波形傳輸
 
 - ESP-IDF 5.5.0 交叉編譯成功，無 compiler warning／error；USB CDC RX 2048 bytes、TX 8192 bytes 已核對生成的 `sdkconfig.h`。靜態 RAM 66,932 bytes；新 app 1,061,153 bytes，image 1,061,680 bytes。esptool 確認 checksum 與 image hash 有效。
 - 新增 USB CDC JSON RPC，與 HTTP 共用設定驗證與狀態；支援設定、按鍵效果、即時 PCM、三種錄音目的地及裝置 WAV 下載。PCM 附 Base64、長度與 CRC32。
 - `python tools/test-keypad-usb.py` 的 11 個測試通過：任意切包與混合日誌、忽略舊回應、開埠不要求 reset、設定只傳一次、帶正負 PCM 的 CRC、異常音訊與 metadata 拒絕、錄音 owner、HTTP status、協定版本、裝置選擇，以及下載完成／錯誤清理。
 - 既有本機相容預覽 5 個測試及 Web PCM／WAV 測試通過。USB 網頁顯示 USB 連線提示，USB 模式拒絕 Wi-Fi 切換參數；程式不呼叫 Wi-Fi 管理命令。
-- 實際 USB 埠已確認；舊韌體不回應 RPC，也無法經 esptool 自動進入下載模式。**新版待手動 BOOT／RESET 後燒錄與實機驗證**。主機測試不代表實體 USB 吞吐與收音品質已通過。
+- 實際 USB 埠已確認；舊韌體不回應 RPC，也無法經 esptool 自動進入下載模式。該 USB 版本後續已燒錄並驗證，見上方實機紀錄；收音品質仍未通過。
 
 新增測試：`python tools/test-keypad-usb.py`。
 
@@ -90,7 +103,7 @@ node tools/test-keypad-web.cjs
 
 1. USB HID + CDC 枚舉、F13–F16／自訂映射、四鍵組合與按放 release。
 2. 四顆 RGB 的實際對應位置、六種效果；NS4168 喇叭四種音效及音量。
-3. ICS-43434 收音左右 slot／資料對齊、音量增益及削波。
+3. 實際 ZTS6672 的 SELECT／CONFIG、收音 slot／資料對齊、人聲音量與削波。
 4. Wi-Fi AP、手機控制、實際麥克風串流至瀏覽器 WAV；弱網路下的溢出提示。
 5. Flash 短錄音、重開機後下載、保存期間的即時性；真實斷電恢復。
 6. 若卡座可使用，再測試 SD 掛載、錄音、停止、下載及空間不足行為。

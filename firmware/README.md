@@ -1,6 +1,6 @@
 # PCB2 ESP32-S3 board library
 
-原生 ESP-IDF component，提供 4 顆按鍵、4 顆 WS2812B RGB LED、ICS-43434 麥克風、NS4168 擴大機與 microSD 的控制介面。固定使用 ESP-IDF 5.5 系列與官方 `espressif/led_strip` 3.0.3；沒有 Arduino 相依。
+原生 ESP-IDF component，提供 4 顆按鍵、4 顆 WS2812B RGB LED、ZTS6672／ICS-43434 麥克風、NS4168 擴大機與 microSD 的控制介面。固定使用 ESP-IDF 5.5 系列與官方 `espressif/led_strip` 3.0.3；沒有 Arduino 相依。
 
 完整的 **USB HID 鍵盤 + LED 樣態 + 喇叭音效 + 收音／錄音 + Web App** 位於 [keyboard/README.md](keyboard/README.md)。錄音可選瀏覽器、內建 Flash 或 microSD，沒有 SD 卡也能使用；從專案根目錄執行 `./tools/build.ps1 -Keyboard` 建置。以下內容為底層 board library 與原始硬體示範程式。
 
@@ -88,7 +88,15 @@ void app_main(void) {
 
 LED 顏色使用 RGB 0~255，底層輸出 GRB。索引 0~3 對應 LED3~LED6。`set`、`fill`、`brightness` 都先更新緩衝，呼叫 `show()` 才送出；亮度縮放保留原始顏色，來回調整不會逐次損失色彩。預設 brightness 為 32/255。
 
-音訊使用 I2S0 full duplex、Philips 格式、每聲道 32-bit slot／每 frame 64 BCLK。U10 的 LR 腳接地，所以只擷取左聲道的 24-bit 資料；NS4168 收到相同的左右聲道單聲道 PCM。共用時鐘意味著收、播必須使用同一採樣率。支援 16／32／44.1／48 kHz；預設 48 kHz，BCLK 為 3.072 MHz。沒有 MCLK 接線。
+音訊使用 I2S0 full duplex、Philips 格式、每聲道 32-bit slot／每 frame 64 BCLK。使用者於 2026-10-13 確認實際裝的是 **ZTS6672**，不是保存快照的 ICS-43434。型號由 `menuconfig → PCB2 board` 選擇；這是建置標示，不會自動偵測。
+
+ZillTek DS-13 第 6 頁寫明 CONFIG 懸空、SELECT 接地對應右聲道；但本板右聲道實測全零，先前左聲道有非零訊號。**兩者不一致的原因仍未確定**，不可據此宣稱讀取格式或焊接已正確。本版預設左聲道以保留現有輸入；可用 `CONFIG_PCB2_MIC_RIGHT_SLOT` 更改開機聲道。啟動等待 50 ms。ICS-43434 的 LR 接地按規格使用左聲道。
+
+鍵盤網頁提供暫時的左右聲道診斷切換，錄音期間禁止切換，重啟恢復建置聲道。API 狀態另提供兩個原始 slot 的 min／max、PCM24 平均值與扣除均值後的 AC RMS（取自最近 DMA block，增益之前）。`pcb2_audio_set_mic_right()`／`pcb2_audio_mic_right()` 可安全跨 task 呼叫；停止錄音後才可切換。`pcb2_audio_get_diagnostics()` 取得同時讀到的雙 slot 統計。
+
+ZTS6672 的 CONFIG／SELECT 實際焊接狀態與底部進音通道尚需實板確認；PCB 圖面上的圓形不能代替製造鑽孔證據。料件報告與設計快照分開保存在 [populated-hardware.json](../hardware/evidence/populated-hardware.json)。
+
+NS4168 收到相同的左右聲道單聲道 PCM。共用時鐘意味著收、播必須使用同一採樣率。支援 16／32／44.1／48 kHz；預設 48 kHz，BCLK 為 3.072 MHz。沒有 MCLK 接線。
 
 ```c
 int32_t microphone[PCB2_AUDIO_BLOCK_FRAMES]; // signed 24-bit，右對齊
@@ -110,7 +118,7 @@ SD 使用 SPI2、10 MHz，mount path 固定為 `/sdcard`，可用標準 `fopen`�
 - 電池、充電器、穩壓器、電源切換和充電指示 LED 沒有 MCU 控制／量測接腳，因此沒有虛構電池百分比、充電狀態或軟體關機 API。
 - 保存電路的 MOD1 5V header 直連模組 USB。原理圖已註明電池模式須拔掉 USB；程式不能提供缺少的電源隔離。
 - NS4168 控制腳在電路中固定接供電；library 以零 PCM 靜音，不能透過 GPIO 關閉功放電源。
-- 實機尚未燒錄驗證，GPIO 接腳核對與編譯不代表 LED 的 3.3V→5V data 電位、SD 完整性、聲學路徑或供電能力已實測。
+- 使用此 library 的鍵盤 USB 診斷版已燒錄，麥克風資料傳輸與控制結果見 [鍵盤驗證紀錄](keyboard/VALIDATION.md)。獨立 bring-up／Unity 測試尚未在板子上執行；GPIO 核對、編譯與 USB 傳輸不代表 LED 的 3.3V→5V data 電位、SD 完整性、聲學路徑或供電能力已實測。
 
 ## 檢查與測試
 

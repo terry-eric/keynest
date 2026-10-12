@@ -2,6 +2,7 @@
 #include "app_api.h"
 #include "recorder.h"
 #include "mic_monitor.h"
+#include "pcb2_board.h"
 #include "esp_http_server.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
@@ -63,6 +64,26 @@ cJSON *app_state_json(void) {
     cJSON_AddBoolToObject(json, "dirty", state.dirty); cJSON_AddBoolToObject(json, "audio_ready", state.audio_ready);
     cJSON_AddNumberToObject(json, "mic_dbfs", state.mic_dbfs); cJSON_AddNumberToObject(json, "mic_peak", state.mic_peak);
     cJSON_AddBoolToObject(json, "mic_preview", true);
+#if CONFIG_PCB2_MIC_ZTS6672
+    cJSON_AddStringToObject(json, "mic_model", "ZTS6672");
+#else
+    cJSON_AddStringToObject(json, "mic_model", "ICS-43434");
+#endif
+    cJSON_AddStringToObject(json, "mic_slot", pcb2_audio_mic_right() ? "right" : "left");
+    pcb2_audio_diagnostics_t slots; pcb2_audio_get_diagnostics(&slots);
+    cJSON *slot_array = cJSON_AddArrayToObject(json, "mic_slots");
+    if (slot_array && slots.frames) for (unsigned ch = 0; ch < 2; ++ch) {
+        double mean = (double)slots.sum[ch] / slots.frames;
+        double variance = fmax(0, (double)slots.squares[ch] / slots.frames - mean * mean);
+        cJSON *slot = cJSON_CreateObject(); if (!slot) continue;
+        cJSON_AddStringToObject(slot, "slot", ch ? "right" : "left");
+        cJSON_AddNumberToObject(slot, "frames", slots.frames);
+        cJSON_AddNumberToObject(slot, "min", slots.min[ch]);
+        cJSON_AddNumberToObject(slot, "max", slots.max[ch]);
+        cJSON_AddNumberToObject(slot, "dc_pcm24", mean);
+        cJSON_AddNumberToObject(slot, "ac_dbfs", 20 * log10(fmax(sqrt(variance) / 8388608, 0.000001)));
+        cJSON_AddItemToArray(slot_array, slot);
+    }
     cJSON_AddNumberToObject(json, "queue_drops", state.queue_drops);
     cJSON_AddItemToObject(json, "config", config_json(&state.config));
     cJSON *rec = cJSON_AddObjectToObject(json, "recording");
@@ -166,6 +187,15 @@ esp_err_t app_command_execute(const char *path, cJSON *body) {
                 }
             }
         }
+    } else if (!strcmp(path, "/api/microphone/channel")) {
+        const char *const fields[] = {"slot"};
+        cJSON *slot = cJSON_GetObjectItemCaseSensitive(body, "slot");
+        if (fields_match(body, fields, 1) && cJSON_IsString(slot) &&
+            (!strcmp(slot->valuestring, "left") || !strcmp(slot->valuestring, "right"))) {
+            recorder_status_t recording; recorder_snapshot(&recording);
+            if (recording.state) result = ESP_ERR_INVALID_STATE;
+            else { pcb2_audio_set_mic_right(!strcmp(slot->valuestring, "right")); result = ESP_OK; }
+        }
     } else if (!strcmp(path, "/api/save") && fields_match(body, NULL, 0)) result = app_save_config();
     else if (!strcmp(path, "/api/sd") && fields_match(body, NULL, 0)) result = recorder_retry_mount();
     return result;
@@ -249,7 +279,7 @@ esp_err_t web_server_start(void) {
     if (err == ESP_OK) err = esp_wifi_set_config(WIFI_IF_AP, &wifi);
     if (err == ESP_OK) err = esp_wifi_start();
     if (err != ESP_OK) return err;
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG(); config.stack_size = 8192; config.max_uri_handlers = 12;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG(); config.stack_size = 8192; config.max_uri_handlers = 16;
     config.max_open_sockets = 6; config.lru_purge_enable = true; config.recv_wait_timeout = 3; config.send_wait_timeout = 3;
     httpd_handle_t server; err = httpd_start(&server, &config); if (err != ESP_OK) return err;
     const char *assets[] = {"/", "/app.js", "/style.css"};
@@ -265,8 +295,8 @@ esp_err_t web_server_start(void) {
     err = httpd_register_uri_handler(server, &audio); if (err != ESP_OK) return err;
     httpd_uri_t microphone = {.uri = "/api/microphone", .method = HTTP_GET, .handler = microphone_get};
     err = httpd_register_uri_handler(server, &microphone); if (err != ESP_OK) return err;
-    const char *commands[] = {"/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd"};
-    for (unsigned i = 0; i < 5; ++i) {
+    const char *commands[] = {"/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/microphone/channel"};
+    for (unsigned i = 0; i < sizeof(commands) / sizeof(commands[0]); ++i) {
         httpd_uri_t uri = {.uri = commands[i], .method = HTTP_POST, .handler = command_post};
         err = httpd_register_uri_handler(server, &uri); if (err != ESP_OK) return err;
     }

@@ -34,3 +34,7 @@ static inline int32_t pcb2_slot_to_pcm24(int32_t slot) {
     // discards them on the ESP32 GCC toolchain.
     return slot >> 8;
 }
+
+static inline int32_t pcb2_stereo_to_pcm24(const int32_t frame[2], bool right) {
+    return pcb2_slot_to_pcm24(frame[right ? 1 : 0]);
+}

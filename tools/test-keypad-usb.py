@@ -76,6 +76,17 @@ class Tests(unittest.TestCase):
         self.device.request("/api/config", json.dumps(config).encode())
         self.assertEqual(self.serial.commands, [{"id": 1, "path": "/api/config", "body": config}])
 
+    def test_invalid_json_does_not_become_a_valid_usb_command(self):
+        for raw in (b'{"slot":"left","slot":"right"}',
+                    b'{"slot":"left","slo\\u0074":"right"}',
+                    b'{"config":{"mic_gain":2,"mic_gain":8}}',
+                    b'{"slot":', b'[]', b'null', b'\xff'):
+            with self.subTest(raw=raw), self.assertRaises(DeviceError) as caught:
+                self.device.request("/api/microphone/channel", raw)
+            self.assertEqual(caught.exception.status, 400)
+        self.assertEqual(self.serial.commands, [])
+        self.assertEqual(self.serial.open_states, [])
+
     def test_real_signed_pcm_and_metadata(self):
         pcm = struct.pack("<hhhh", -32768, -120, 454, 32767)
         self.respond(dict(binary(pcm), rate=16000, frames=4000, age_ms=10))

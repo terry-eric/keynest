@@ -56,7 +56,7 @@ function initialize() {
   let monitoring = false, monitorGeneration = 0, monitorTimer, micStats = null, micFrames = -1, micReceived = 0;
   const history = Array(70).fill(0), rows = [];
   const defaults = {led_mode:4,brightness:64,speed:80,volume:10,mic_gain:2,sound:2,color:[120,88,255],keycodes:[104,105,106,107],modifiers:[0,0,0,0]};
-  const simulation = {config:structuredClone(defaults),dirty:false,keys:0,audio_ready:true,mic_preview:true,usb_connected:true,ssid:"PCB2-Keypad-DEMO",ip:"展示模式",mic_dbfs:-32,mic_peak:.12,recording:{sd_ready:false,flash_ready:true,mounting:false,downloading:false,state:0,target:0,last_target:1,frames:0,duration_ms:0,dropped_frames:0,limit_seconds:60,flash_limit_seconds:2.048,filename:"",error:""}};
+  const simulation = {config:structuredClone(defaults),dirty:false,keys:0,audio_ready:true,mic_preview:true,mic_model:"ZTS6672",mic_slot:"left",usb_connected:true,ssid:"PCB2-Keypad-DEMO",ip:"展示模式",mic_dbfs:-32,mic_peak:.12,recording:{sd_ready:false,flash_ready:true,mounting:false,downloading:false,state:0,target:0,last_target:1,frames:0,duration_ms:0,dropped_frames:0,limit_seconds:60,flash_limit_seconds:2.048,filename:"",error:""}};
   let demoStarted=0, demoDelivered=0;
   $("demo-banner").hidden = !demo;
   for (let i=0;i<4;i++) {
@@ -100,6 +100,7 @@ function initialize() {
     }
   }
   async function demoRequest(path,body) {
+    if(path==="/api/microphone/channel")simulation.mic_slot=body.slot;
     updateDemo();
     if (path==="/api/state") return structuredClone(simulation);
     if (path==="/api/config") {simulation.config=structuredClone(body);simulation.dirty=true;}
@@ -147,6 +148,7 @@ function initialize() {
     $("sd-retry").disabled=!connected||busy||recording||r?.mounting||r?.sd_ready;
     $("record-target").options[1].disabled=!!state&&!r?.flash_ready;$("record-target").options[2].disabled=!!state&&!r?.sd_ready;
     $("monitor-toggle").disabled=!monitoring&&(!connected||!state?.audio_ready||state?.mic_preview===false);
+    $("mic-channel").disabled=!connected||busy||recording||!!capture||!state?.mic_slot;
     if(monitoring&&state?.mic_preview_legacy)["record-start","sd-retry","save"].forEach(id=>$(id).disabled=true);
   }
   function targetHelp() {
@@ -161,6 +163,7 @@ function initialize() {
     if(!edited)$("save-state").textContent=next.dirty?"已套用・尚未保存":"設定已保存";
     $("usb-status").textContent=next.usb_connected?"USB HID 已連接":"USB 尚未連接";$("usb-status").classList.toggle("active",next.usb_connected);
     $("mic-status").textContent=next.audio_ready?"收音中":"音訊未就緒";$("mic-status").classList.toggle("active",next.audio_ready);
+    if(next.mic_slot)$("mic-channel").value=next.mic_slot;
     if (!monitoring) showLevel(next.audio_ready?next.mic_dbfs:null, false);
     history.push(next.audio_ready?(monitoring?(micStats?.acPeak||0):next.mic_peak):0);history.shift();drawHistory();
     document.querySelectorAll("[data-trigger]").forEach(button=>button.classList.toggle("down",!!(next.keys&(1<<Number(button.dataset.trigger)))));
@@ -289,6 +292,10 @@ function initialize() {
   $("apply").addEventListener("click",()=>action(async()=>{await apply();toast("設定已套用，保存後會在重開機保留。");}));
   $("save").addEventListener("click",()=>action(async()=>{if(edited)await apply();await request("/api/save",{});toast("設定已保存到裝置。");}));
   $("test-sound").addEventListener("click",()=>action(()=>trigger(0)));$("reconnect").addEventListener("click",poll);
+  $("mic-channel").addEventListener("change",()=>action(async()=>{
+    await request("/api/microphone/channel",{slot:$("mic-channel").value});
+    micFrames=-1;clearMicrophone("聲道已切換，正在取得新資料…");await poll();
+  }));
   $("monitor-toggle").addEventListener("click",()=>{
     monitoring=!monitoring;++monitorGeneration;clearTimeout(monitorTimer);micFrames=-1;
     $("monitor-toggle").textContent=monitoring?"停止即時監測":"開始即時監測";$("monitor-toggle").setAttribute("aria-pressed",String(monitoring));

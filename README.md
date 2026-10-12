@@ -5,7 +5,7 @@
 - 四顆可設定的 USB HID 按鍵，預設 F13–F16，支援修飾鍵與同時按住。
 - 四顆 RGB LED，六種樣態，可調色、亮度與速度。
 - NS4168 喇叭四種合成音效與音量控制。
-- ICS-43434 麥克風即時音量、PCM 波形、直流偏移診斷、數位增益與 WAV 錄音。
+- ZTS6672 麥克風即時音量、PCM 波形、直流偏移診斷、數位增益與 WAV 錄音；可選 ICS-43434 建置設定。
 - Web App 可透過 USB 本機工具或裝置 Wi-Fi 控制，不需網際網路或 SD 卡。
 
 | 錄音目的地 | 預設上限 | 保存方式 |
@@ -48,7 +48,7 @@ python -m http.server 8027 --bind 127.0.0.1 --directory firmware/keyboard/main/w
 
 ## 驗證與硬體依據
 
-2026-10-13 已完成 USB 控制與即時波形版本的交叉編譯、主機測試與網頁展示驗證。另以實際 PCB 上的既有韌體驗證麥克風取樣及免 SD 的 WAV 串流；收音有明顯直流偏移、聲音偏弱，品質尚未通過。新版 USB 實機驗證狀態見 [驗證紀錄](firmware/keyboard/VALIDATION.md)。接腳依 2026-09-19 EasyEDA 保存快照。
+2026-10-13 已實際燒錄並驗證 USB 控制、即時波形及免 SD 的 WAV 串流。使用者確認麥克風為 ZTS6672；左聲道有資料、右聲道專用建置實測全零，與取得的規格書表格不一致，收音品質尚未通過。診斷與實機驗證狀態見 [驗證紀錄](firmware/keyboard/VALIDATION.md)。接腳依 2026-09-19 EasyEDA 保存快照。
 
 - [硬體接腳證據](hardware/evidence/hardware-map.json)
 - [已建置韌體](firmware/artifacts/keyboard/)及 [SHA-256 manifest](firmware/artifacts/keyboard/manifest.json)

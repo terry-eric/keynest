@@ -1,0 +1,30 @@
+menu "PCB2 board"
+
+choice PCB2_MICROPHONE
+    prompt "Populated microphone (pin 2 tied to GND)"
+    default PCB2_MIC_ZTS6672
+    help
+        Select the actual fitted part, rather than the schematic library name.
+        ZTS6672 DS-13 specifies the right I2S slot with SELECT low and CONFIG
+        open. ICS-43434 uses the left slot with LR low. This setting does not
+        change the shared speaker I2S clocks or format.
+
+config PCB2_MIC_ZTS6672
+    bool "ZillTek ZTS6672"
+
+config PCB2_MIC_ICS43434
+    bool "TDK ICS-43434 (LR low; left slot)"
+
+endchoice
+
+config PCB2_MIC_RIGHT_SLOT
+    bool "Read right microphone slot at startup"
+    default n
+    help
+        The tested PCB currently provides nonzero data only in the left slot.
+        ZTS6672 DS-13 specifies right with SELECT low and CONFIG open, so its
+        actual mode/pin state still needs checking. Override this for a board
+        confirmed to drive right. The keypad diagnostic selector can switch
+        slots temporarily without changing clocks or reflashing.
+
+endmenu

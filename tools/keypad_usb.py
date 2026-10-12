@@ -13,6 +13,15 @@ class DeviceError(RuntimeError):
         super().__init__(message)
 
 
+def _unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise DeviceError(400, "Duplicate JSON field")
+        result[key] = value
+    return result
+
+
 class UsbDevice:
     transport = "usb"
 
@@ -153,7 +162,15 @@ class UsbDevice:
             else:
                 result.update({"X-PCB2-State": self.integer(data, "state", 4), "X-PCB2-Dropped": self.integer(data, "dropped")})
             return pcm, result
-        data = self.rpc(path, None if body is None else json.loads(body))
+        arguments = None
+        if body is not None:
+            try:
+                arguments = json.loads(body, object_pairs_hook=_unique_json_object)
+            except (ValueError, UnicodeError) as error:
+                raise DeviceError(400, "Invalid JSON body") from error
+            if not isinstance(arguments, dict):
+                raise DeviceError(400, "Use a JSON object")
+        data = self.rpc(path, arguments)
         return json.dumps(data).encode(), {"Content-Type": "application/json"}
 
     def download(self):
