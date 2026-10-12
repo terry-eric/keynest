@@ -1,0 +1,246 @@
+#include "app.h"
+#include "recorder.h"
+#include "esp_http_server.h"
+#include "esp_wifi.h"
+#include "esp_netif.h"
+#include "esp_event.h"
+#include "esp_mac.h"
+#include "esp_timer.h"
+#include "esp_log.h"
+#include "cJSON.h"
+#include "sdkconfig.h"
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <stdio.h>
+#include <math.h>
+
+extern const unsigned char html_start[] asm("_binary_index_html_start"), html_end[] asm("_binary_index_html_end");
+extern const unsigned char js_start[] asm("_binary_app_js_start"), js_end[] asm("_binary_app_js_end");
+extern const unsigned char css_start[] asm("_binary_style_css_start"), css_end[] asm("_binary_style_css_end");
+static char ap_name[33];
+
+static esp_err_t json_response(httpd_req_t *req, cJSON *json) {
+    if (!json) return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+    char *text = cJSON_PrintUnformatted(json); cJSON_Delete(json);
+    if (!text) return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+    httpd_resp_set_type(req, "application/json"); httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    esp_err_t err = httpd_resp_send(req, text, HTTPD_RESP_USE_STRLEN); free(text); return err;
+}
+static esp_err_t json_error(httpd_req_t *req, const char *status_code, const char *message) {
+    httpd_resp_set_status(req, status_code);
+    cJSON *json = cJSON_CreateObject();
+    if (json) cJSON_AddStringToObject(json, "error", message);
+    return json_response(req, json);
+}
+static esp_err_t operation_response(httpd_req_t *req, esp_err_t err) {
+    if (err != ESP_OK) return json_error(req, err == ESP_ERR_INVALID_STATE ? "409 Conflict" : "503 Service Unavailable", esp_err_to_name(err));
+    cJSON *json = cJSON_CreateObject(); if (json) cJSON_AddBoolToObject(json, "ok", true);
+    return json_response(req, json);
+}
+static void add_bytes(cJSON *object, const char *name, const uint8_t *bytes, unsigned count) {
+    cJSON *array = cJSON_AddArrayToObject(object, name);
+    if (array) for (unsigned i = 0; i < count; ++i) cJSON_AddItemToArray(array, cJSON_CreateNumber(bytes[i]));
+}
+static cJSON *config_json(const keypad_config_t *c) {
+    cJSON *json = cJSON_CreateObject(); if (!json) return NULL;
+    cJSON_AddNumberToObject(json, "led_mode", c->led_mode); cJSON_AddNumberToObject(json, "brightness", c->brightness);
+    cJSON_AddNumberToObject(json, "speed", c->speed); cJSON_AddNumberToObject(json, "volume", c->volume);
+    cJSON_AddNumberToObject(json, "mic_gain", c->mic_gain); cJSON_AddNumberToObject(json, "sound", c->sound);
+    add_bytes(json, "color", c->color, 3); add_bytes(json, "keycodes", c->keycodes, 4); add_bytes(json, "modifiers", c->modifiers, 4);
+    return json;
+}
+static esp_err_t state_get(httpd_req_t *req) {
+    app_snapshot_t state; app_snapshot(&state);
+    recorder_status_t recording; recorder_snapshot(&recording);
+    cJSON *json = cJSON_CreateObject(); if (!json) return json_response(req, NULL);
+    cJSON_AddStringToObject(json, "device", "PCB2 Keypad"); cJSON_AddStringToObject(json, "ssid", ap_name);
+    cJSON_AddStringToObject(json, "ip", "192.168.4.1"); cJSON_AddNumberToObject(json, "uptime_ms", esp_timer_get_time() / 1000);
+    cJSON_AddBoolToObject(json, "usb_connected", usb_keyboard_connected()); cJSON_AddNumberToObject(json, "keys", state.keys);
+    cJSON_AddBoolToObject(json, "dirty", state.dirty); cJSON_AddBoolToObject(json, "audio_ready", state.audio_ready);
+    cJSON_AddNumberToObject(json, "mic_dbfs", state.mic_dbfs); cJSON_AddNumberToObject(json, "mic_peak", state.mic_peak);
+    cJSON_AddNumberToObject(json, "queue_drops", state.queue_drops);
+    cJSON_AddItemToObject(json, "config", config_json(&state.config));
+    cJSON *rec = cJSON_AddObjectToObject(json, "recording");
+    if (rec) {
+        cJSON_AddBoolToObject(rec, "sd_ready", recording.sd_ready); cJSON_AddBoolToObject(rec, "mounting", recording.mounting);
+        cJSON_AddBoolToObject(rec, "flash_ready", recording.flash_ready);
+        cJSON_AddNumberToObject(rec, "target", recording.target); cJSON_AddNumberToObject(rec, "last_target", recording.last_target);
+        cJSON_AddBoolToObject(rec, "downloading", recording.downloading); cJSON_AddNumberToObject(rec, "state", recording.state);
+        cJSON_AddNumberToObject(rec, "frames", recording.frames);
+        cJSON_AddNumberToObject(rec, "duration_ms", (double)recording.frames * 1000 / CAPTURE_RATE);
+        cJSON_AddNumberToObject(rec, "dropped_frames", recording.dropped_frames);
+        cJSON_AddNumberToObject(rec, "limit_seconds", CONFIG_PCB2_RECORD_SECONDS);
+        cJSON_AddNumberToObject(rec, "flash_limit_seconds", (double)FLASH_CAPTURE_FRAMES / CAPTURE_RATE);
+        cJSON_AddStringToObject(rec, "filename", recording.filename); cJSON_AddStringToObject(rec, "error", recording.error);
+    }
+    return json_response(req, json);
+}
+static bool fields_match(cJSON *root, const char *const *allowed, unsigned count) {
+    if (!cJSON_IsObject(root)) return false;
+    for (cJSON *item = root->child; item; item = item->next) {
+        bool found = false;
+        for (unsigned i = 0; i < count; ++i) if (item->string && !strcmp(item->string, allowed[i])) found = true;
+        if (!found) return false;
+        for (cJSON *other = item->next; other; other = other->next)
+            if (other->string && !strcmp(item->string, other->string)) return false;
+    }
+    return true;
+}
+static bool number(cJSON *item, unsigned min, unsigned max, uint8_t *result) {
+    if (!cJSON_IsNumber(item) || !isfinite(item->valuedouble) || item->valuedouble < min || item->valuedouble > max ||
+        floor(item->valuedouble) != item->valuedouble) return false;
+    *result = item->valuedouble; return true;
+}
+static bool byte_array(cJSON *root, const char *name, uint8_t *out, unsigned count) {
+    cJSON *array = cJSON_GetObjectItemCaseSensitive(root, name);
+    if (!cJSON_IsArray(array) || cJSON_GetArraySize(array) != count) return false;
+    for (unsigned i = 0; i < count; ++i) if (!number(cJSON_GetArrayItem(array, i), 0, 255, &out[i])) return false;
+    return true;
+}
+static bool parse_config(cJSON *json, keypad_config_t *out) {
+    static const char *const names[] = {"led_mode","brightness","speed","volume","mic_gain","sound","color","keycodes","modifiers"};
+    if (!fields_match(json, names, 9)) return false;
+    memset(out, 0, sizeof(*out)); out->schema = 1;
+    return number(cJSON_GetObjectItemCaseSensitive(json, "led_mode"), 0, LED_MODE_COUNT - 1, &out->led_mode) &&
+        number(cJSON_GetObjectItemCaseSensitive(json, "brightness"), 0, 255, &out->brightness) &&
+        number(cJSON_GetObjectItemCaseSensitive(json, "speed"), 20, 200, &out->speed) &&
+        number(cJSON_GetObjectItemCaseSensitive(json, "volume"), 0, 100, &out->volume) &&
+        number(cJSON_GetObjectItemCaseSensitive(json, "mic_gain"), 1, 16, &out->mic_gain) &&
+        number(cJSON_GetObjectItemCaseSensitive(json, "sound"), 0, SOUND_COUNT - 1, &out->sound) &&
+        byte_array(json, "color", out->color, 3) && byte_array(json, "keycodes", out->keycodes, 4) &&
+        byte_array(json, "modifiers", out->modifiers, 4) && logic_config_valid(out);
+}
+static cJSON *read_body(httpd_req_t *req) {
+    char control[8] = {0}, content_type[64] = {0};
+    if (httpd_req_get_hdr_value_str(req, "X-PCB2-Control", control, sizeof(control)) != ESP_OK || strcmp(control, "1")) {
+        json_error(req, "403 Forbidden", "Missing control header"); return NULL;
+    }
+    if (httpd_req_get_hdr_value_str(req, "Content-Type", content_type, sizeof(content_type)) != ESP_OK ||
+        strncasecmp(content_type, "application/json", 16) || (content_type[16] && content_type[16] != ';')) {
+        json_error(req, "415 Unsupported Media Type", "Use application/json"); return NULL;
+    }
+    if (req->content_len == 0 || req->content_len > 1536) {
+        json_error(req, "413 Content Too Large", "JSON body must be 1..1536 bytes"); return NULL;
+    }
+    char *body = malloc(req->content_len + 1);
+    if (!body) { json_error(req, "503 Service Unavailable", "Out of memory"); return NULL; }
+    size_t received = 0;
+    while (received < req->content_len) {
+        int result = httpd_req_recv(req, body + received, req->content_len - received);
+        if (result <= 0) { free(body); json_error(req, "408 Request Timeout", "Incomplete request"); return NULL; }
+        received += result;
+    }
+    body[received] = 0;
+    cJSON *json = memchr(body, 0, received) ? NULL : cJSON_ParseWithLengthOpts(body, received + 1, NULL, true);
+    free(body);
+    if (!cJSON_IsObject(json)) { cJSON_Delete(json); json_error(req, "400 Bad Request", "Invalid JSON object"); return NULL; }
+    return json;
+}
+static esp_err_t command_post(httpd_req_t *req) {
+    cJSON *body = read_body(req); if (!body) return ESP_FAIL; // Close unread/malformed request bodies.
+    esp_err_t result = ESP_ERR_INVALID_ARG;
+    if (!strcmp(req->uri, "/api/config")) {
+        keypad_config_t config;
+        if (parse_config(body, &config)) result = app_apply_config(&config);
+    } else if (!strcmp(req->uri, "/api/trigger")) {
+        const char *const fields[] = {"key"}; uint8_t key;
+        if (fields_match(body, fields, 1) && number(cJSON_GetObjectItemCaseSensitive(body, "key"), 0, 3, &key)) result = app_trigger_key(key);
+    } else if (!strcmp(req->uri, "/api/record")) {
+        const char *const fields[] = {"action", "target", "owner"}; cJSON *action = cJSON_GetObjectItemCaseSensitive(body, "action");
+        if (fields_match(body, fields, 3) && cJSON_IsString(action)) {
+            if (!strcmp(action->valuestring, "stop")) result = recorder_stop();
+            if (!strcmp(action->valuestring, "start")) {
+                app_snapshot_t state; app_snapshot(&state);
+                cJSON *target = cJSON_GetObjectItemCaseSensitive(body, "target"), *owner = cJSON_GetObjectItemCaseSensitive(body, "owner");
+                if (cJSON_IsString(target) && cJSON_IsString(owner)) {
+                    unsigned destination = !strcmp(target->valuestring, "browser") ? REC_BROWSER :
+                        !strcmp(target->valuestring, "flash") ? REC_FLASH : !strcmp(target->valuestring, "sd") ? REC_SD : 99;
+                    result = state.audio_ready ? recorder_begin(destination, owner->valuestring) : ESP_ERR_INVALID_STATE;
+                }
+            }
+        }
+    } else if (!strcmp(req->uri, "/api/save") && fields_match(body, NULL, 0)) result = app_save_config();
+    else if (!strcmp(req->uri, "/api/sd") && fields_match(body, NULL, 0)) result = recorder_retry_mount();
+    cJSON_Delete(body);
+    if (result == ESP_ERR_INVALID_ARG) return json_error(req, "400 Bad Request", "Invalid or unknown fields");
+    return operation_response(req, result);
+}
+static esp_err_t file_get(httpd_req_t *req) {
+    char filename[16]; esp_err_t err = recorder_download_begin(filename);
+    if (err != ESP_OK) return json_error(req, "409 Conflict", "Finish recording before downloading");
+    char disposition[80]; snprintf(disposition, sizeof(disposition), "attachment; filename=\"%s\"", filename);
+    httpd_resp_set_type(req, "audio/wav"); httpd_resp_set_hdr(req, "Content-Disposition", disposition);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    char buffer[2048]; size_t bytes, offset = 0;
+    while ((err = recorder_download_read(offset, buffer, sizeof(buffer), &bytes)) == ESP_OK && bytes) {
+        err = httpd_resp_send_chunk(req, buffer, bytes); if (err != ESP_OK) break;
+        offset += bytes;
+    }
+    recorder_download_end();
+    if (err == ESP_OK) err = httpd_resp_send_chunk(req, NULL, 0);
+    return err;
+}
+static esp_err_t audio_get(httpd_req_t *req) {
+    char owner[17] = {0};
+    if (httpd_req_get_hdr_value_str(req, "X-PCB2-Recording", owner, sizeof(owner)) != ESP_OK)
+        return json_error(req, "403 Forbidden", "Missing recording owner");
+    int16_t buffer[1024]; size_t count = 0;
+    esp_err_t err = recorder_stream_read(owner, buffer, 1024, &count);
+    if (err != ESP_OK) return json_error(req, "409 Conflict", "Recording belongs to another session");
+    recorder_status_t status; recorder_snapshot(&status);
+    char state[12], frames[16], dropped[16];
+    snprintf(state, sizeof(state), "%u", status.state); snprintf(frames, sizeof(frames), "%lu", (unsigned long)status.frames);
+    snprintf(dropped, sizeof(dropped), "%lu", (unsigned long)status.dropped_frames);
+    httpd_resp_set_type(req, "application/octet-stream"); httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "X-PCB2-State", state); httpd_resp_set_hdr(req, "X-PCB2-Frames", frames);
+    httpd_resp_set_hdr(req, "X-PCB2-Dropped", dropped);
+    return httpd_resp_send(req, (const char *)buffer, count * sizeof(int16_t));
+}
+static esp_err_t asset_get(httpd_req_t *req) {
+    const unsigned char *start = html_start, *end = html_end; const char *type = "text/html; charset=utf-8";
+    if (!strcmp(req->uri, "/app.js")) { start = js_start; end = js_end; type = "text/javascript; charset=utf-8"; }
+    if (!strcmp(req->uri, "/style.css")) { start = css_start; end = css_end; type = "text/css; charset=utf-8"; }
+    httpd_resp_set_type(req, type); httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
+    httpd_resp_set_hdr(req, "Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+    return httpd_resp_send(req, (const char *)start, end - start - 1);
+}
+esp_err_t web_server_start(void) {
+    if (strlen(CONFIG_PCB2_AP_PREFIX) > 26 || strlen(CONFIG_PCB2_AP_PASSWORD) < 8 || strlen(CONFIG_PCB2_AP_PASSWORD) > 63) return ESP_ERR_INVALID_ARG;
+    esp_err_t err = esp_netif_init(); if (err != ESP_OK) return err;
+    err = esp_event_loop_create_default(); if (err != ESP_OK) return err;
+    if (!esp_netif_create_default_wifi_ap()) return ESP_ERR_NO_MEM;
+    wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT(); err = esp_wifi_init(&init); if (err != ESP_OK) return err;
+    uint8_t mac[6]; err = esp_read_mac(mac, ESP_MAC_WIFI_SOFTAP); if (err != ESP_OK) return err;
+    snprintf(ap_name, sizeof(ap_name), "%s-%02X%02X", CONFIG_PCB2_AP_PREFIX, mac[4], mac[5]);
+    wifi_config_t wifi = {.ap = {.channel = 6, .max_connection = 4, .authmode = WIFI_AUTH_WPA2_PSK}};
+    wifi.ap.ssid_len = strlen(ap_name);
+    memcpy(wifi.ap.ssid, ap_name, wifi.ap.ssid_len);
+    snprintf((char *)wifi.ap.password, sizeof(wifi.ap.password), "%s", CONFIG_PCB2_AP_PASSWORD);
+    err = esp_wifi_set_mode(WIFI_MODE_AP);
+    if (err == ESP_OK) err = esp_wifi_set_config(WIFI_IF_AP, &wifi);
+    if (err == ESP_OK) err = esp_wifi_start();
+    if (err != ESP_OK) return err;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG(); config.stack_size = 8192; config.max_uri_handlers = 12;
+    config.max_open_sockets = 6; config.lru_purge_enable = true; config.recv_wait_timeout = 3; config.send_wait_timeout = 3;
+    httpd_handle_t server; err = httpd_start(&server, &config); if (err != ESP_OK) return err;
+    const char *assets[] = {"/", "/app.js", "/style.css"};
+    for (unsigned i = 0; i < 3; ++i) {
+        httpd_uri_t uri = {.uri = assets[i], .method = HTTP_GET, .handler = asset_get};
+        err = httpd_register_uri_handler(server, &uri); if (err != ESP_OK) return err;
+    }
+    httpd_uri_t state = {.uri = "/api/state", .method = HTTP_GET, .handler = state_get};
+    err = httpd_register_uri_handler(server, &state); if (err != ESP_OK) return err;
+    httpd_uri_t file = {.uri = "/api/recording.wav", .method = HTTP_GET, .handler = file_get};
+    err = httpd_register_uri_handler(server, &file); if (err != ESP_OK) return err;
+    httpd_uri_t audio = {.uri = "/api/audio", .method = HTTP_GET, .handler = audio_get};
+    err = httpd_register_uri_handler(server, &audio); if (err != ESP_OK) return err;
+    const char *commands[] = {"/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd"};
+    for (unsigned i = 0; i < 5; ++i) {
+        httpd_uri_t uri = {.uri = commands[i], .method = HTTP_POST, .handler = command_post};
+        err = httpd_register_uri_handler(server, &uri); if (err != ESP_OK) return err;
+    }
+    ESP_LOGI("web", "Connect to %s, then open http://192.168.4.1", ap_name);
+    return ESP_OK;
+}

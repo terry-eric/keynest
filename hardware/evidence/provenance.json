@@ -1,0 +1,8 @@
+{
+  "source": "C:\\Users\\user\\Documents\\Codex\\2026-09-12\\referenced-chatgpt-conversation-this-is-an\\work\\review",
+  "snapshot_date": "2026-09-19",
+  "live_connection_verified": false,
+  "reason": "Existing local adapter cannot listen on 127.0.0.1:8765 (EACCES).",
+  "pcb_source_sha256": "ac498ec8b58fca2cb915199e654a04b1d5b56accd91197386489fc5c66ce43fd",
+  "archive_sha256": "d83f11f2e3d9319a4dc3df63b472be92c95e37986f0d29346e53c07d64da878a"
+}

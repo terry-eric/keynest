@@ -1,0 +1,25 @@
+.tools/
+firmware/.pio/
+firmware/build/
+firmware/managed_components/
+firmware/sdkconfig
+firmware/sdkconfig.*.old
+firmware/sdkconfig.pcb2_s3
+firmware/tests/.pio/
+firmware/tests/build/
+firmware/tests/managed_components/
+firmware/tests/sdkconfig
+firmware/tests/sdkconfig.*.old
+firmware/tests/sdkconfig.pcb2_s3
+firmware/keyboard/.pio/
+firmware/keyboard/build/
+firmware/keyboard/managed_components/
+firmware/keyboard/sdkconfig
+firmware/keyboard/sdkconfig.*.old
+firmware/keyboard/sdkconfig.pcb2_s3
+**/__pycache__/
+hardware/evidence/*-records.json
+
+# Local research unrelated to the PCB2 keypad firmware.
+/analysis/
+/research/

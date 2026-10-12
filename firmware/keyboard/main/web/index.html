@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#10121a"><title>PCB2 · 四鍵控制台</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header class="topbar"><a class="brand" href="/"><span class="brandmark">P2</span><span>PCB2<span class="brand-sub">KEYPAD STUDIO</span></span></a><span class="connection" id="connection" role="status"><i></i>連線中</span><button class="quiet" id="reconnect">重新連線</button></header>
+<main>
+  <div class="heading"><div><p class="eyebrow">YOUR FOUR KEYS, YOUR WAY</p><h1>四鍵控制台<span class="dot">.</span></h1><p class="subtitle">按鍵、燈光與聲音，都在這裡設定。</p></div><div class="heading-actions"><span id="save-state">尚未讀取裝置</span><button class="button primary" id="save">保存到裝置 <span>↗</span></button></div></div>
+  <div class="offline" id="offline" hidden><strong>尚未連上鍵盤</strong><span>連上 PCB2-Keypad-XXXX Wi-Fi 後，開啟 http://192.168.4.1。連線恢復時會自動更新。</span></div>
+  <div class="demo-banner" id="demo-banner" hidden>展示模式 · 控制及音量為模擬資料，沒有連接實體鍵盤。</div>
+  <div class="dashboard">
+    <section class="panel board-panel"><div class="panel-head"><div><span class="section-number">01</span><h2>鍵盤預覽</h2></div><span class="pill" id="usb-status">USB 尚未確認</span></div>
+      <div class="board" id="board"><div class="board-label">PCB2 / S3 <span>4-KEY</span></div><div class="keycaps">
+        <button class="keycap" data-trigger="0" aria-label="測試 KEY1 的 LED 與音效"><span class="key-name">KEY 01</span><strong id="key-label-0">F13</strong><span class="key-detail" id="key-mod-0">按鍵</span></button>
+        <button class="keycap" data-trigger="1" aria-label="測試 KEY2 的 LED 與音效"><span class="key-name">KEY 02</span><strong id="key-label-1">F14</strong><span class="key-detail" id="key-mod-1">按鍵</span></button>
+        <button class="keycap" data-trigger="2" aria-label="測試 KEY3 的 LED 與音效"><span class="key-name">KEY 03</span><strong id="key-label-2">F15</strong><span class="key-detail" id="key-mod-2">按鍵</span></button>
+        <button class="keycap" data-trigger="3" aria-label="測試 KEY4 的 LED 與音效"><span class="key-name">KEY 04</span><strong id="key-label-3">F16</strong><span class="key-detail" id="key-mod-3">按鍵</span></button>
+      </div><div class="board-bottom"><span><i></i>ESP32-S3</span><span>USB HID + Wi-Fi</span></div></div>
+      <p class="caption">點擊預覽鍵測試 LED 與喇叭音效。實體按鍵會送出 USB 鍵盤輸入。</p>
+    </section>
+    <section class="panel mic-panel"><div class="panel-head"><div><span class="section-number">02</span><h2>麥克風</h2></div><span class="pill" id="mic-status">等待收音</span></div>
+      <div class="meter-value"><strong id="dbfs">—</strong><span>dBFS</span><span class="meter-label">數位音量</span></div><div class="meter"><div id="meter-fill"></div></div><div class="scale"><span>−90</span><span>−45</span><span>0</span></div>
+      <canvas id="level-history" width="580" height="110" aria-label="最近音量變化"></canvas>
+      <label class="range-label" for="mic-gain">收音增益 <output id="gain-value">2×</output></label><input id="mic-gain" type="range" min="1" max="16" value="2"><p class="caption">增益過高會削波。音量為 dBFS，並非校準的環境分貝。</p>
+    </section>
+    <section class="panel"><div class="panel-head"><div><span class="section-number">03</span><h2>LED 樣態</h2></div><span class="mini-label">4 × RGB</span></div>
+      <div class="patterns" role="group" aria-label="LED 樣態"><button data-mode="0">○<span>關閉</span></button><button data-mode="1">●<span>常亮</span></button><button data-mode="2">◉<span>呼吸</span></button><button data-mode="3">◒<span>彩虹</span></button><button data-mode="4" class="selected">◎<span>按鍵漣漪</span></button><button data-mode="5">▥<span>隨音律動</span></button></div>
+      <div class="color-row"><label for="color">主色</label><div class="swatches"><button data-color="#7858ff" class="swatch violet" aria-label="紫色"></button><button data-color="#48e0c2" class="swatch mint" aria-label="青色"></button><button data-color="#ffb36b" class="swatch orange" aria-label="橙色"></button><button data-color="#edf0ff" class="swatch white" aria-label="白色"></button></div><input id="color" type="color" value="#7858ff" aria-label="自訂 LED 顏色"></div>
+      <label class="range-label" for="brightness">亮度 <output id="brightness-value">25%</output></label><input id="brightness" type="range" min="0" max="255" value="64">
+      <label class="range-label" for="speed">動畫速度 <output id="speed-value">80%</output></label><input id="speed" type="range" min="20" max="200" value="80">
+    </section>
+    <section class="panel"><div class="panel-head"><div><span class="section-number">04</span><h2>按鍵音效</h2></div><span class="mini-label">NS4168</span></div>
+      <label class="field-label" for="sound">音效風格</label><select id="sound"><option value="0">靜音</option><option value="1">輕點 · Click</option><option value="2" selected>和弦 · Chime</option><option value="3">復古 · Retro</option><option value="4">泡泡 · Bubble</option></select>
+      <label class="range-label" for="volume">喇叭音量 <output id="volume-value">10%</output></label><input id="volume" type="range" min="0" max="100" value="10">
+      <div class="sound-note"><span class="sound-icon">♪</span><div><strong>每顆按鍵，都有自己的音高</strong><p>四種合成音效，帶淡入淡出。可同時混合四鍵聲音。</p></div></div><button id="test-sound" class="button secondary">♪ 測試音效</button>
+    </section>
+    <section class="panel mapping-panel"><div class="panel-head"><div><span class="section-number">05</span><h2>USB 按鍵映射</h2></div><span class="mini-label">套用後生效</span></div><div class="mapping-header"><span>實體按鍵</span><span>輸出的按鍵</span><span>修飾鍵</span></div><div id="mappings"></div><div class="apply-row"><p class="caption">預設 F13–F16。可同時按住四鍵；放開時會送出 release。</p><button class="button secondary" id="apply">套用變更</button></div></section>
+    <section class="panel recording-panel"><div class="panel-head"><div><span class="section-number">06</span><h2>錄音與保存</h2></div><span class="pill" id="rec-status">待命</span></div>
+      <label class="field-label" for="record-target">這次要存在哪裡？</label><select id="record-target"><option value="browser">瀏覽器 · 保存到手機／電腦</option><option value="flash">內建 Flash · 裝置短錄音</option><option value="sd">microSD · 選用</option></select><p class="target-help" id="target-help">不用 SD 卡。請保持網頁開啟與 Wi-Fi 連線，完成後下載 WAV。</p>
+      <div class="record-display"><span id="record-dot"></span><strong id="rec-duration">00:00.0</strong><span>16 kHz · mono · WAV</span></div><div class="record-actions"><button class="button record" id="record-start">● 開始錄音</button><button class="button secondary" id="record-stop" disabled>■ 停止</button></div>
+      <p class="record-error" id="record-error" role="status"></p><div class="record-files"><a class="download-link disabled" id="browser-download">↓ 下載本次瀏覽器錄音</a><button class="download-link" id="device-download" disabled>↓ 下載裝置保存的錄音</button></div><div class="storage-row"><span id="flash-status">Flash 尚未確認</span><span id="sd-status">SD 尚未確認</span><button class="quiet" id="sd-retry">重新偵測 SD</button></div>
+    </section>
+  </div>
+  <footer><span>PCB2 KEYPAD STUDIO <i>／</i> ESP-IDF</span><span id="device-address">192.168.4.1 · 裝置提供的離線控制頁面</span></footer>
+</main><div class="toast" id="toast" role="status" hidden></div>
+</body></html>

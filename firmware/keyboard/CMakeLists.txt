@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.16)
+list(APPEND EXTRA_COMPONENT_DIRS "../components/pcb2_board")
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+set(COMPONENTS main)
+if(EXISTS "$ENV{IDF_PATH}/components/__pio_env/CMakeLists.txt")
+    list(APPEND COMPONENTS __pio_env)
+endif()
+project(pcb2_keypad)

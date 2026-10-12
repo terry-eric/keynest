@@ -1,0 +1,177 @@
+{
+  "snapshot_date": "2026-09-19",
+  "pcb_uuid": "1e950570276235db",
+  "module": "ESP32-S3 SuperMini (schematic override of inherited C3 device)",
+  "gpio_map": {
+    "SD_MISO": {
+      "gpio": 44,
+      "header_pad": 2
+    },
+    "SD_MOSI": {
+      "gpio": 1,
+      "header_pad": 3
+    },
+    "SD_CS": {
+      "gpio": 2,
+      "header_pad": 4
+    },
+    "RGB_DIN": {
+      "gpio": 13,
+      "header_pad": 15
+    },
+    "SD_SCK": {
+      "gpio": 12,
+      "header_pad": 14
+    },
+    "I2S_WS": {
+      "gpio": 4,
+      "header_pad": 6
+    },
+    "I2S_DIN": {
+      "gpio": 11,
+      "header_pad": 13
+    },
+    "I2S_BCLK": {
+      "gpio": 5,
+      "header_pad": 7
+    },
+    "I2S_DOUT": {
+      "gpio": 10,
+      "header_pad": 12
+    },
+    "KEY4": {
+      "gpio": 6,
+      "header_pad": 8
+    },
+    "KEY1": {
+      "gpio": 9,
+      "header_pad": 11
+    },
+    "KEY3": {
+      "gpio": 7,
+      "header_pad": 9
+    },
+    "KEY2": {
+      "gpio": 8,
+      "header_pad": 10
+    }
+  },
+  "parts": {
+    "U10": {
+      "Manufacturer Part": "ICS-43434",
+      "Supplier Part": "C5656610",
+      "Datasheet": "https://item.szlcsc.com/datasheet/ICS-43434/6577565.html"
+    },
+    "U9": {
+      "Manufacturer Part": "NS4168",
+      "Supplier Part": "C910588",
+      "Datasheet": "https://item.szlcsc.com/datasheet/NS4168/978904.html"
+    },
+    "LED3": {
+      "Manufacturer Part": "WS2812B-2020-V6",
+      "Supplier Part": "C52917434",
+      "Datasheet": "https://item.szlcsc.com/datasheet/WS2812B-2020-V6/55827425.html"
+    }
+  },
+  "pad_nets": {
+    "MOD1": {
+      "1": "",
+      "18": "+5V",
+      "2": "SD_MISO",
+      "17": "GND",
+      "3": "SD_MOSI",
+      "16": "",
+      "4": "SD_CS",
+      "15": "RGB_DIN",
+      "5": "",
+      "14": "SD_SCK",
+      "6": "I2S_WS",
+      "13": "I2S_DIN",
+      "7": "I2S_BCLK",
+      "12": "I2S_DOUT",
+      "8": "KEY4",
+      "11": "KEY1",
+      "9": "KEY3",
+      "10": "KEY2"
+    },
+    "U10": {
+      "1": "I2S_WS",
+      "2": "GND",
+      "4": "I2S_BCLK",
+      "5": "VCC",
+      "6": "I2S_DIN",
+      "3": "GND"
+    },
+    "U9": {
+      "1": "VCC_amp",
+      "2": "I2S_WS",
+      "3": "I2S_BCLK",
+      "4": "I2S_DOUT",
+      "5": "$3N38",
+      "6": "VCC_amp",
+      "7": "GND",
+      "8": "$3N37",
+      "9": "GND"
+    },
+    "LED3": {
+      "2": "GND",
+      "3": "RGB_DIN",
+      "4": "+5V",
+      "1": "LED3_DO"
+    },
+    "LED4": {
+      "2": "GND",
+      "3": "LED3_DO",
+      "4": "+5V",
+      "1": "LED4_DO"
+    },
+    "LED5": {
+      "2": "GND",
+      "3": "LED4_DO",
+      "4": "+5V",
+      "1": "LED5_DO"
+    },
+    "LED6": {
+      "2": "GND",
+      "3": "LED5_DO",
+      "4": "+5V",
+      "1": ""
+    },
+    "CARD1": {
+      "1": "SD_DAT2",
+      "2": "SD_CS",
+      "3": "SD_MOSI",
+      "4": "VCC_amp",
+      "5": "SD_SCK",
+      "6": "GND",
+      "7": "SD_MISO",
+      "8": "SD_DAT1",
+      "9": "",
+      "10": "",
+      "17": "",
+      "18": "",
+      "11": "GND",
+      "12": "",
+      "13": "",
+      "14": "",
+      "15": "",
+      "16": ""
+    },
+    "U2": {
+      "1": "KEY1",
+      "2": "GND"
+    },
+    "U5": {
+      "1": "KEY2",
+      "2": "GND"
+    },
+    "U6": {
+      "1": "KEY3",
+      "2": "GND"
+    },
+    "U7": {
+      "1": "KEY4",
+      "2": "GND"
+    }
+  }
+}

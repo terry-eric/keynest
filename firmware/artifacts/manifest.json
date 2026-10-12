@@ -1,0 +1,55 @@
+{
+  "built_at": "2026-10-05",
+  "target": "esp32s3",
+  "idf": "5.5.0",
+  "flash_size": "4MB",
+  "demo_and_tests_physically_run": false,
+  "files": [
+    {
+      "path": "firmware.bin",
+      "bytes": 360544,
+      "sha256": "eb9fbc6fe9d0048ce96f9915df44e8d61f86f1bd0ff614c89f108a6eef87d1dc",
+      "flash_offset": "0x10000"
+    },
+    {
+      "path": "bootloader.bin",
+      "bytes": 21408,
+      "sha256": "8a24c560514a914fc1e8b52d50a0e0b6859c42d4be072132c812003ff4b622da",
+      "flash_offset": "0x0"
+    },
+    {
+      "path": "partitions.bin",
+      "bytes": 3072,
+      "sha256": "5e71c3c890e04714daa03b21a0d23953a2dadf9fdf15eec02b886f7b6e9f8c81",
+      "flash_offset": "0x8000"
+    },
+    {
+      "path": "firmware.elf",
+      "bytes": 5101900,
+      "sha256": "cf806d33008c62930a6f8900ed05c28c58c60670dfbc450cad22834d7d7b10d7"
+    },
+    {
+      "path": "tests/firmware.bin",
+      "bytes": 200016,
+      "sha256": "8e6cea4faf811888f63d6aa81c42f7e25dcd932c99ce728be4a765f49507fef5",
+      "flash_offset": "0x10000"
+    },
+    {
+      "path": "tests/bootloader.bin",
+      "bytes": 21408,
+      "sha256": "8deed7122a3cea439aa2674a973c1e09c7cdf869ba42b939a410d3398ba5c4ca",
+      "flash_offset": "0x0"
+    },
+    {
+      "path": "tests/partitions.bin",
+      "bytes": 3072,
+      "sha256": "7f00b6c042a89b15b0cac534f82ed988caf29278ff5700b0c511eb1b5bb7c820",
+      "flash_offset": "0x8000"
+    },
+    {
+      "path": "tests/firmware.elf",
+      "bytes": 3607844,
+      "sha256": "e3f159c252b9deab886bfa096fdf03307367028fb4aacfa9e1a764856577e74e"
+    }
+  ]
+}

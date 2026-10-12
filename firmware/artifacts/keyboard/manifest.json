@@ -1,0 +1,174 @@
+{
+  "built_at": "2026-10-05",
+  "project": "pcb2_keypad",
+  "target": "esp32s3",
+  "idf": "5.5.0",
+  "flash_size": "4MB",
+  "app_partition_bytes": 2097152,
+  "recording_partition": {
+    "offset": "0x210000",
+    "bytes": 262144,
+    "capture_seconds": 2.048
+  },
+  "esptool_checksum_and_hash_validated": true,
+  "physically_run": false,
+  "files": [
+    {
+      "path": "bootloader.bin",
+      "bytes": 21376,
+      "sha256": "bf7565babc12a5e018a93d382e78344ca629e1969bd1b369b6acdd039ac7d112",
+      "flash_offset": "0x0"
+    },
+    {
+      "path": "partitions.bin",
+      "bytes": 3072,
+      "sha256": "95729977cc5a3a9df6a00ae115d750a2235b8fe5465446d6905c232b60993163",
+      "flash_offset": "0x8000"
+    },
+    {
+      "path": "firmware.bin",
+      "bytes": 1048480,
+      "sha256": "a0bcace687deeb3ce438592d5086d7b03ebd314c5141b24a28be84bbdb2b0c11",
+      "flash_offset": "0x10000"
+    },
+    {
+      "path": "firmware.elf",
+      "bytes": 10787884,
+      "sha256": "a334e491bdd597001ee9a6e9e015b8082a0113f9bd721dbc492cf6969bd6adae"
+    }
+  ],
+  "sources": [
+    {
+      "path": "firmware/keyboard/main/app.h",
+      "sha256": "9a255ee4633968229660ca8acff05fa4b5123298c6d69bf6c216795444161d3a"
+    },
+    {
+      "path": "firmware/keyboard/main/app_logic.c",
+      "sha256": "e409d81b09c56cfa706f1d982420f93d04edd5350be04f29ef39febe9e14e4b2"
+    },
+    {
+      "path": "firmware/keyboard/main/app_logic.h",
+      "sha256": "a2e23a4c9a732ff5466b77001e017687fda21ae88a49aeb667874266c5376af0"
+    },
+    {
+      "path": "firmware/keyboard/main/app_main.c",
+      "sha256": "4d5c00b181407c8b7e86b0be80c89c5a98e8276bc778c594f0103b5cb1b5a9c8"
+    },
+    {
+      "path": "firmware/keyboard/main/audio_worker.c",
+      "sha256": "cec2bf844d1048bac8afa8d25400cd565cc54b2409a1d2ebd4f13f60eba4d0fd"
+    },
+    {
+      "path": "firmware/keyboard/main/CMakeLists.txt",
+      "sha256": "51988809dd61339d546504fc5b406e968e2ac09e406f580de17b569552224acd"
+    },
+    {
+      "path": "firmware/keyboard/main/controller.c",
+      "sha256": "4694399d892547e4d9c100ac1a3b8f074e236143c6206cda62ba1ebc9547dbba"
+    },
+    {
+      "path": "firmware/keyboard/main/flash_store.c",
+      "sha256": "bfcb48a859dc39284e74981fbec7d92e8e533b28819a7767c6534bef6c350f50"
+    },
+    {
+      "path": "firmware/keyboard/main/flash_store.h",
+      "sha256": "8dd127e5eb13d045f39993e39c92b62c454f42a9a1a90adc0ca49686c308006b"
+    },
+    {
+      "path": "firmware/keyboard/main/idf_component.yml",
+      "sha256": "2ad1ed77e7a7f328ad779482ce5d0941d13b7f1c0136ba605e6e9837f8914911"
+    },
+    {
+      "path": "firmware/keyboard/main/Kconfig.projbuild",
+      "sha256": "335417b63fee67a65bceaf44400a524559a9bc7d1ef028e637505986b371f7fe"
+    },
+    {
+      "path": "firmware/keyboard/main/recorder.c",
+      "sha256": "f23b91f3bf37ae28badcca98c4316cedddfcff1b5ed195dfb4532a31806182a8"
+    },
+    {
+      "path": "firmware/keyboard/main/recorder.h",
+      "sha256": "8efece1ce3fc471f7b43af1925237c7fe01cb1d1b085a76b1f01fe6f49c9a8fe"
+    },
+    {
+      "path": "firmware/keyboard/main/usb_keyboard.c",
+      "sha256": "9cee5ad5b69d541f993195666fd71e77eba64537685709f394a5a64e06091811"
+    },
+    {
+      "path": "firmware/keyboard/main/web_server.c",
+      "sha256": "7c0695c27f98b5b73f3989a504d8704936930b285fb2870e264659ce9999525a"
+    },
+    {
+      "path": "firmware/keyboard/main/web/app.js",
+      "sha256": "2ffa3a512badee5ae302878254fc4bf1fe88df406519f0b692ac21c47ae73955"
+    },
+    {
+      "path": "firmware/keyboard/main/web/index.html",
+      "sha256": "d77f3c70003d2b982f3989ed94c0a1d9ec2603f32142592ca4806ce9e749a9a1"
+    },
+    {
+      "path": "firmware/keyboard/main/web/style.css",
+      "sha256": "c44b3c6c694ef0eede6f5c12bcc99969e84218bc66b226cf996525f14b822e86"
+    },
+    {
+      "path": "firmware/keyboard/CMakeLists.txt",
+      "sha256": "418ede64e42984d710448ea0099903659656f0cde79dc8a9f3c0b5b70dfd03f6"
+    },
+    {
+      "path": "firmware/keyboard/platformio.ini",
+      "sha256": "55853d5c6fa19a53723beacb7726863753d50df3a5eabb9fc148e9ec8053a366"
+    },
+    {
+      "path": "firmware/keyboard/sdkconfig.defaults",
+      "sha256": "5988ca0dc93791082fe22d26020411a6275b46b5803da54e8ba9aa8042a65844"
+    },
+    {
+      "path": "firmware/keyboard/partitions.csv",
+      "sha256": "452250b38811bb7bf4be3b5c56c1a03247f4e5f410f07392770145e810df11fa"
+    },
+    {
+      "path": "firmware/keyboard/dependencies.lock",
+      "sha256": "2ef00a249521cf23bd29a710d877d690642d607576e6e1d9a181a4ed608ef8f2"
+    },
+    {
+      "path": "firmware/components/pcb2_board/audio.c",
+      "sha256": "40e49e698955ffe3a0833a0e1637b1196740fdb4f32fdd3f5bca46502f169fe9"
+    },
+    {
+      "path": "firmware/components/pcb2_board/board.c",
+      "sha256": "c81e5f4db2a27e9a9bfc86b8b7e5bc7e8804f322d2263c61f3b5bd700f325740"
+    },
+    {
+      "path": "firmware/components/pcb2_board/board_logic.h",
+      "sha256": "9172a633f43ea094b518b64a7d22e33b2d1699cb8877d9d8a2b78be153cedb0c"
+    },
+    {
+      "path": "firmware/components/pcb2_board/CMakeLists.txt",
+      "sha256": "c157964bfe404b3860f56933306fd5966abce479644ef57efc05df7edf0ce35d"
+    },
+    {
+      "path": "firmware/components/pcb2_board/idf_component.yml",
+      "sha256": "6353309ac84b12dbe2356518c8dea82e9ddf5b2ccda72d825e02c419ac7c3c55"
+    },
+    {
+      "path": "firmware/components/pcb2_board/storage.c",
+      "sha256": "b7a451d190cc278c26dfcd5ba4fce823bd518201f6d3726df9e3406b4a9f2ee8"
+    },
+    {
+      "path": "firmware/components/pcb2_board/include/pcb2_board.h",
+      "sha256": "02db8be317b20d3ece494f8d7e351cae71807d6fa14f86fe84f22de3cf5a07f2"
+    },
+    {
+      "path": "firmware/components/pcb2_board/include/pcb2_pins.h",
+      "sha256": "7118976c604b26eb5d9e8d3a7937c178c32cb3443e359b23c59fe33da08df7e1"
+    },
+    {
+      "path": "firmware/components/pcb2_board/test/CMakeLists.txt",
+      "sha256": "dec6fb046f53a41912c45a8a622d6140c3ab36fe12b0fb7dc8c801f663863d9d"
+    },
+    {
+      "path": "firmware/components/pcb2_board/test/test_board_logic.c",
+      "sha256": "a4e48346b9e45415984a04fda9565c7ff9046804b8dd5e09e7959479070ff5ca"
+    }
+  ]
+}

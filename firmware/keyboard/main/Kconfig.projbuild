@@ -1,0 +1,12 @@
+menu "PCB2 Keypad"
+    config PCB2_AP_PREFIX
+        string "Wi-Fi AP name prefix (up to 26 ASCII characters)"
+        default "PCB2-Keypad"
+    config PCB2_AP_PASSWORD
+        string "Wi-Fi WPA2 password (8 to 63 characters)"
+        default "pcb2play"
+    config PCB2_RECORD_SECONDS
+        int "Maximum duration of one WAV recording"
+        range 10 300
+        default 60
+endmenu

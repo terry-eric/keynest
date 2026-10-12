@@ -1,0 +1,11 @@
+const assert = require('node:assert/strict');
+const {wavHeader, validateAudioChunk} = require('../firmware/keyboard/main/web/app.js');
+const header = Buffer.from(wavHeader(32768));
+assert.equal(header.length,44); assert.equal(header.toString('ascii',0,4),'RIFF');
+assert.equal(header.readUInt32LE(4),65572); assert.equal(header.readUInt32LE(24),16000);
+assert.equal(header.readUInt32LE(28),32000); assert.equal(header.readUInt16LE(34),16);
+assert.equal(header.readUInt32LE(40),65536);
+for(const invalid of [-1,1.5,Infinity,NaN,4800001]) assert.throws(()=>wavHeader(invalid));
+assert.equal(validateAudioChunk(new ArrayBuffer(0)),0); assert.equal(validateAudioChunk(new ArrayBuffer(2048)),1024);
+assert.throws(()=>validateAudioChunk(new ArrayBuffer(3))); assert.throws(()=>validateAudioChunk(new ArrayBuffer(2050)));
+console.log('PASS: browser WAV layout, duration bounds and malformed PCM rejection');
