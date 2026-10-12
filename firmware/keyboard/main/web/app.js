@@ -14,8 +14,30 @@ function validateAudioChunk(buffer, maximum = 2048) {
   if (!(buffer instanceof ArrayBuffer) || buffer.byteLength % 2 || buffer.byteLength > maximum) throw new Error("Invalid PCM response");
   return buffer.byteLength / 2;
 }
+function analyzePCM(buffer) {
+  const count = validateAudioChunk(buffer);
+  if (!count) throw new Error("No microphone samples");
+  const view = new DataView(buffer), samples = new Int16Array(count);
+  let sum = 0, squares = 0, clipped = 0;
+  for (let i = 0; i < count; ++i) {
+    const value = view.getInt16(i * 2, true); samples[i] = value;
+    sum += value; squares += value * value;
+    if (value === -32768 || value === 32767) ++clipped;
+  }
+  const dc = sum / count;
+  let acSquares = 0, acPeak = 0;
+  for (const value of samples) {const ac = (value - dc) / 32768;acSquares += ac * ac;acPeak = Math.max(acPeak, Math.abs(ac));}
+  const db = value => 20 * Math.log10(Math.max(value, 0.000001));
+  return {samples, dc, rawDbfs:db(Math.sqrt(squares / count) / 32768), acDbfs:db(Math.sqrt(acSquares / count)), acPeak, peakDbfs:db(acPeak), clipped};
+}
+function validateMicrophonePacket(packet) {
+  const count = validateAudioChunk(packet.buffer);
+  if (!count || packet.rate !== 16000 || !Number.isSafeInteger(packet.frames) || packet.frames < count ||
+      !Number.isFinite(packet.ageMs) || packet.ageMs < 0 || packet.ageMs > 1000) throw new Error("Invalid or stale microphone response");
+  return packet;
+}
 if (typeof module === "object" && module.exports) {
-  module.exports = { wavHeader, validateAudioChunk };
+  module.exports = { wavHeader, validateAudioChunk, analyzePCM, validateMicrophonePacket };
 } else {
   document.addEventListener("DOMContentLoaded", initialize);
 }
@@ -31,9 +53,10 @@ function initialize() {
   for (let i=0;i<12;i++) keyNames.set(104+i, "F"+(i+13));
   let draft = null, state = null, edited = false, connected = false, busy = false, epoch = 0, capture = null;
   let downloadURL = null, toastTimer, polling = false, downloading = false, captureError = "";
+  let monitoring = false, monitorGeneration = 0, monitorTimer, micStats = null, micFrames = -1, micReceived = 0;
   const history = Array(70).fill(0), rows = [];
   const defaults = {led_mode:4,brightness:64,speed:80,volume:10,mic_gain:2,sound:2,color:[120,88,255],keycodes:[104,105,106,107],modifiers:[0,0,0,0]};
-  const simulation = {config:structuredClone(defaults),dirty:false,keys:0,audio_ready:true,usb_connected:true,ssid:"PCB2-Keypad-DEMO",ip:"展示模式",mic_dbfs:-32,mic_peak:.12,recording:{sd_ready:false,flash_ready:true,mounting:false,downloading:false,state:0,target:0,last_target:1,frames:0,duration_ms:0,dropped_frames:0,limit_seconds:60,flash_limit_seconds:2.048,filename:"",error:""}};
+  const simulation = {config:structuredClone(defaults),dirty:false,keys:0,audio_ready:true,mic_preview:true,usb_connected:true,ssid:"PCB2-Keypad-DEMO",ip:"展示模式",mic_dbfs:-32,mic_peak:.12,recording:{sd_ready:false,flash_ready:true,mounting:false,downloading:false,state:0,target:0,last_target:1,frames:0,duration_ms:0,dropped_frames:0,limit_seconds:60,flash_limit_seconds:2.048,filename:"",error:""}};
   let demoStarted=0, demoDelivered=0;
   $("demo-banner").hidden = !demo;
   for (let i=0;i<4;i++) {
@@ -59,6 +82,7 @@ function initialize() {
     $("connection").replaceChildren(Object.assign(document.createElement("i"),{}),document.createTextNode(demo?"展示模式":value?"裝置已連線":"裝置離線"));
     $("offline").hidden=value; controls();
     if (!value) { $("usb-status").textContent="USB 狀態未知"; $("usb-status").classList.remove("active"); $("mic-status").textContent="收音狀態未知"; $("mic-status").classList.remove("active"); $("dbfs").textContent="—"; $("meter-fill").style.width="0%"; document.querySelectorAll(".keycap").forEach(key=>key.classList.remove("down")); }
+    if (!value && monitoring) clearMicrophone("裝置離線，等待重新連線。");
   }
   async function request(path,body) {
     if (demo) return demoRequest(path,body);
@@ -122,6 +146,8 @@ function initialize() {
     $("device-download").disabled=!connected||busy||downloading||recording||!r?.filename;
     $("sd-retry").disabled=!connected||busy||recording||r?.mounting||r?.sd_ready;
     $("record-target").options[1].disabled=!!state&&!r?.flash_ready;$("record-target").options[2].disabled=!!state&&!r?.sd_ready;
+    $("monitor-toggle").disabled=!monitoring&&(!connected||!state?.audio_ready||state?.mic_preview===false);
+    if(monitoring&&state?.mic_preview_legacy)["record-start","sd-retry","save"].forEach(id=>$(id).disabled=true);
   }
   function targetHelp() {
     const target=$("record-target").value,r=state?.recording;
@@ -130,12 +156,13 @@ function initialize() {
   }
   function render(next) {
     state=next;
+    $("preview-close").hidden=!next.local_preview;
     if (!draft || !edited && JSON.stringify(draft)!==JSON.stringify(next.config)) loadConfig(next.config);
     if(!edited)$("save-state").textContent=next.dirty?"已套用・尚未保存":"設定已保存";
     $("usb-status").textContent=next.usb_connected?"USB HID 已連接":"USB 尚未連接";$("usb-status").classList.toggle("active",next.usb_connected);
     $("mic-status").textContent=next.audio_ready?"收音中":"音訊未就緒";$("mic-status").classList.toggle("active",next.audio_ready);
-    $("dbfs").textContent=next.audio_ready?Number(next.mic_dbfs).toFixed(1):"—";$("meter-fill").style.width=next.audio_ready?Math.max(0,Math.min(100,(next.mic_dbfs+90)/90*100))+"%":"0%";
-    history.push(next.audio_ready?next.mic_peak:0);history.shift();drawHistory();
+    if (!monitoring) showLevel(next.audio_ready?next.mic_dbfs:null, false);
+    history.push(next.audio_ready?(monitoring?(micStats?.acPeak||0):next.mic_peak):0);history.shift();drawHistory();
     document.querySelectorAll("[data-trigger]").forEach(button=>button.classList.toggle("down",!!(next.keys&(1<<Number(button.dataset.trigger)))));
     const r=next.recording;$("rec-status").textContent=["待命","準備中","錄音中","完成與保存中","錄音已停止"][r.state]||"未知";$("rec-status").classList.toggle("active",r.state===2);
     $("record-dot").classList.toggle("live",r.state===2);const seconds=r.duration_ms/1000;$("rec-duration").textContent=String(Math.floor(seconds/60)).padStart(2,"0")+":"+(seconds%60).toFixed(1).padStart(4,"0");
@@ -148,6 +175,64 @@ function initialize() {
     const canvas=$("level-history"),ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
     ctx.clearRect(0,0,w,h);ctx.strokeStyle="#333c51";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,h-10);ctx.lineTo(w,h-10);ctx.stroke();
     ctx.strokeStyle="#57dec2";ctx.lineWidth=2;ctx.beginPath();history.forEach((value,i)=>{const x=i/(history.length-1)*w,y=h-10-Math.min(1,value)* (h-25);if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y);});ctx.stroke();
+  }
+  function showLevel(dbfs, ac) {
+    $("dbfs").textContent=dbfs===null?"—":Number(dbfs).toFixed(1);
+    $("meter-fill").style.width=dbfs===null?"0%":Math.max(0,Math.min(100,(dbfs+90)/90*100))+"%";
+    $("meter-label").textContent=ac?"去除直流後音量":"原始數位音量";
+  }
+  function drawWaveform(stats) {
+    const canvas=$("mic-waveform"),ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
+    ctx.clearRect(0,0,w,h);ctx.strokeStyle="#293448";ctx.lineWidth=1;ctx.beginPath();
+    for(let y=0;y<=4;y++){ctx.moveTo(0,y*h/4);ctx.lineTo(w,y*h/4);}
+    for(let x=0;x<=8;x++){ctx.moveTo(x*w/8,0);ctx.lineTo(x*w/8,h);}ctx.stroke();
+    if(!stats)return;
+    const scale=$("wave-auto").checked?Math.min(1024,Math.max(1,.8/Math.max(stats.acPeak,1/32768))):1;
+    $("wave-scale").textContent=scale.toFixed(scale<10?1:0)+"×";
+    $("wave-window").textContent=(stats.samples.length/16).toFixed(1)+" ms · 16 kHz";
+    ctx.strokeStyle=stats.clipped?"#ffad8a":"#57dec2";ctx.lineWidth=1.4;ctx.beginPath();
+    // Min/max per pixel preserves brief impulses that a point-sampled trace can miss.
+    const pixels=Math.min(w,stats.samples.length);
+    for(let x=0;x<pixels;x++) {
+      const first=Math.floor(x*stats.samples.length/pixels),last=Math.floor((x+1)*stats.samples.length/pixels);
+      let min=Infinity,max=-Infinity;
+      for(let i=first;i<last;i++){min=Math.min(min,stats.samples[i]);max=Math.max(max,stats.samples[i]);}
+      const y=value=>h/2-(value-stats.dc)/32768*scale*(h/2-6);
+      ctx.moveTo(x*w/pixels,y(min));ctx.lineTo(x*w/pixels,y(max));
+    }ctx.stroke();
+  }
+  function clearMicrophone(message) {
+    micStats=null;drawWaveform(null);$("mic-raw").textContent="—";$("mic-dc").textContent="—";$("mic-ac-peak").textContent="—";$("wave-scale").textContent="—";
+    $("monitor-note").textContent=message;
+    if(monitoring)showLevel(null,true);
+  }
+  async function microphoneResponse() {
+    if(demo) {
+      const frames=Math.floor(Date.now()/1000*16000),buffer=new ArrayBuffer(2048),view=new DataView(buffer);
+      const amplitude=500+400*Math.sin(Date.now()/700);
+      for(let i=0;i<1024;i++)view.setInt16(i*2,Math.round(454+amplitude*Math.sin((frames-1024+i)*2*Math.PI*220/16000)),true);
+      return {buffer,rate:16000,frames,ageMs:0};
+    }
+    const response=await fetch("/api/microphone",{cache:"no-store",signal:AbortSignal.timeout(1500)});
+    if(!response.ok)throw new Error(response.status===404?"裝置韌體尚未支援波形，請更新韌體。":response.status===409?"目前有其他錄音作業，請先停止錄音。":"麥克風資料中斷，等待恢復。");
+    const numeric=name=>{const value=response.headers.get(name);return value===null||value.trim()===""?NaN:Number(value);};
+    return {buffer:await response.arrayBuffer(),rate:numeric("X-PCB2-Sample-Rate"),frames:numeric("X-PCB2-Frames"),ageMs:numeric("X-PCB2-Age-Ms")};
+  }
+  async function pollMicrophone(generation) {
+    if(!monitoring||generation!==monitorGeneration)return;
+    try {
+      if(!document.hidden&&!downloading) {
+        const packet=validateMicrophonePacket(await microphoneResponse());
+        if(!monitoring||generation!==monitorGeneration)return;
+        if(packet.frames!==micFrames) {
+          micFrames=packet.frames;micReceived=Date.now();micStats=analyzePCM(packet.buffer);
+          showLevel(micStats.acDbfs,true);drawWaveform(micStats);
+          $("mic-raw").textContent=micStats.rawDbfs.toFixed(1);$("mic-dc").textContent=micStats.dc.toFixed(1);$("mic-ac-peak").textContent=micStats.peakDbfs.toFixed(1);
+          $("monitor-note").textContent=micStats.clipped?"音訊已削波，請降低收音增益。":demo?"展示模式：波形為合成音訊，沒有連接 PCB 麥克風。":state?.mic_preview_legacy?"即時相容預覽中：只使用暫存串流，不保存音訊。停止監測後約 2 秒可開始錄音。":"即時監測中。波形和音量已去除直流偏移；自動放大只影響顯示，不修改收音或錄音。";
+        } else if(Date.now()-micReceived>1000) clearMicrophone("麥克風沒有新樣本，等待恢復。");
+      } else clearMicrophone(document.hidden?"頁面在背景，已暫停波形更新。":"下載錄音中，已暫停波形更新。");
+    } catch(error) {if(monitoring&&generation===monitorGeneration){micFrames=-1;clearMicrophone(error.message);}}
+    finally {if(monitoring&&generation===monitorGeneration)monitorTimer=setTimeout(()=>void pollMicrophone(generation),document.hidden?500:100);}
   }
   async function poll() {
     if(polling||downloading)return;polling=true;const current=epoch;
@@ -204,6 +289,19 @@ function initialize() {
   $("apply").addEventListener("click",()=>action(async()=>{await apply();toast("設定已套用，保存後會在重開機保留。");}));
   $("save").addEventListener("click",()=>action(async()=>{if(edited)await apply();await request("/api/save",{});toast("設定已保存到裝置。");}));
   $("test-sound").addEventListener("click",()=>action(()=>trigger(0)));$("reconnect").addEventListener("click",poll);
+  $("monitor-toggle").addEventListener("click",()=>{
+    monitoring=!monitoring;++monitorGeneration;clearTimeout(monitorTimer);micFrames=-1;
+    $("monitor-toggle").textContent=monitoring?"停止即時監測":"開始即時監測";$("monitor-toggle").setAttribute("aria-pressed",String(monitoring));
+    clearMicrophone(monitoring?"正在取得麥克風資料…":"即時監測已停止，沒有保存錄音。");
+    if(monitoring)void pollMicrophone(monitorGeneration);else showLevel(connected&&state?.audio_ready?state.mic_dbfs:null,false);
+    controls();
+  });
+  $("wave-auto").addEventListener("change",()=>drawWaveform(micStats));
+  $("preview-close").addEventListener("click",()=>action(async()=>{
+    await request("/api/preview/close",{});monitoring=false;++monitorGeneration;clearTimeout(monitorTimer);clearInterval(stateTimer);
+    clearMicrophone(state?.preview_wifi_managed?"預覽已結束，正在恢復原本 Wi-Fi。":"本機預覽已結束。");
+    toast(state?.preview_wifi_managed?"已結束預覽，正在恢復原本 Wi-Fi。":"已結束本機預覽。");
+  }));
   $("sd-retry").addEventListener("click",()=>action(async()=>{await request("/api/sd",{});toast("已要求重試 SD 掛載。");}));
   $("record-target").addEventListener("change",targetHelp);
   $("record-start").addEventListener("click",()=>action(async()=>{
@@ -226,6 +324,6 @@ function initialize() {
       const url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download=state.recording.filename||"PCB2.wav";document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
     } finally {downloading=false;controls();}
   }));
-  window.addEventListener("pagehide",()=>{if(capture&&!demo)void fetch("/api/record",{method:"POST",keepalive:true,headers:{"Content-Type":"application/json","X-PCB2-Control":"1"},body:JSON.stringify({action:"stop"})}).catch(()=>{});});
-  loadConfig(defaults);controls();void poll();setInterval(poll,350);
+  window.addEventListener("pagehide",()=>{monitoring=false;++monitorGeneration;clearTimeout(monitorTimer);if(capture&&!demo)void fetch("/api/record",{method:"POST",keepalive:true,headers:{"Content-Type":"application/json","X-PCB2-Control":"1"},body:JSON.stringify({action:"stop"})}).catch(()=>{});});
+  loadConfig(defaults);controls();drawWaveform(null);void poll();const stateTimer=setInterval(poll,350);
 }

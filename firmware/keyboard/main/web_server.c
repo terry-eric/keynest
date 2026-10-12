@@ -1,5 +1,6 @@
 #include "app.h"
 #include "recorder.h"
+#include "mic_monitor.h"
 #include "esp_http_server.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
@@ -14,6 +15,7 @@
 #include <strings.h>
 #include <stdio.h>
 #include <math.h>
+#include <inttypes.h>
 
 extern const unsigned char html_start[] asm("_binary_index_html_start"), html_end[] asm("_binary_index_html_end");
 extern const unsigned char js_start[] asm("_binary_app_js_start"), js_end[] asm("_binary_app_js_end");
@@ -59,6 +61,7 @@ static esp_err_t state_get(httpd_req_t *req) {
     cJSON_AddBoolToObject(json, "usb_connected", usb_keyboard_connected()); cJSON_AddNumberToObject(json, "keys", state.keys);
     cJSON_AddBoolToObject(json, "dirty", state.dirty); cJSON_AddBoolToObject(json, "audio_ready", state.audio_ready);
     cJSON_AddNumberToObject(json, "mic_dbfs", state.mic_dbfs); cJSON_AddNumberToObject(json, "mic_peak", state.mic_peak);
+    cJSON_AddBoolToObject(json, "mic_preview", true);
     cJSON_AddNumberToObject(json, "queue_drops", state.queue_drops);
     cJSON_AddItemToObject(json, "config", config_json(&state.config));
     cJSON *rec = cJSON_AddObjectToObject(json, "recording");
@@ -197,6 +200,22 @@ static esp_err_t audio_get(httpd_req_t *req) {
     httpd_resp_set_hdr(req, "X-PCB2-Dropped", dropped);
     return httpd_resp_send(req, (const char *)buffer, count * sizeof(int16_t));
 }
+static esp_err_t microphone_get(httpd_req_t *req) {
+    int16_t buffer[MIC_MONITOR_FRAMES]; mic_monitor_snapshot_t snapshot;
+    mic_monitor_read(buffer, MIC_MONITOR_FRAMES, &snapshot);
+    int64_t age_ms = (esp_timer_get_time() - snapshot.captured_us) / 1000;
+    if (!snapshot.count || age_ms > 1000)
+        return json_error(req, "503 Service Unavailable", "Microphone samples are not ready");
+    char frames[24], age[24];
+    snprintf(frames, sizeof(frames), "%" PRIu64, snapshot.frames);
+    snprintf(age, sizeof(age), "%" PRId64, age_ms);
+    httpd_resp_set_type(req, "application/octet-stream");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_set_hdr(req, "X-PCB2-Sample-Rate", "16000");
+    httpd_resp_set_hdr(req, "X-PCB2-Frames", frames);
+    httpd_resp_set_hdr(req, "X-PCB2-Age-Ms", age);
+    return httpd_resp_send(req, (const char *)buffer, snapshot.count * sizeof(int16_t));
+}
 static esp_err_t asset_get(httpd_req_t *req) {
     const unsigned char *start = html_start, *end = html_end; const char *type = "text/html; charset=utf-8";
     if (!strcmp(req->uri, "/app.js")) { start = js_start; end = js_end; type = "text/javascript; charset=utf-8"; }
@@ -236,6 +255,8 @@ esp_err_t web_server_start(void) {
     err = httpd_register_uri_handler(server, &file); if (err != ESP_OK) return err;
     httpd_uri_t audio = {.uri = "/api/audio", .method = HTTP_GET, .handler = audio_get};
     err = httpd_register_uri_handler(server, &audio); if (err != ESP_OK) return err;
+    httpd_uri_t microphone = {.uri = "/api/microphone", .method = HTTP_GET, .handler = microphone_get};
+    err = httpd_register_uri_handler(server, &microphone); if (err != ESP_OK) return err;
     const char *commands[] = {"/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd"};
     for (unsigned i = 0; i < 5; ++i) {
         httpd_uri_t uri = {.uri = commands[i], .method = HTTP_POST, .handler = command_post};

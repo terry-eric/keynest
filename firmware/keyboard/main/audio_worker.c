@@ -1,5 +1,6 @@
 #include "app.h"
 #include "recorder.h"
+#include "mic_monitor.h"
 #include "pcb2_board.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -42,7 +43,10 @@ static void worker(void *unused) {
                 average = 0; decimation = 0;
             }
         }
-        if (recording_count) recorder_feed(recording, recording_count);
+        if (recording_count) {
+            mic_monitor_feed(recording, recording_count);
+            recorder_feed(recording, recording_count);
+        }
         size_t offset = 0;
         while (offset < count) {
             size_t written = 0;

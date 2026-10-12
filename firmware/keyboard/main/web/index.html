@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#10121a"><title>PCB2 · 四鍵控制台</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
 <body>
-<header class="topbar"><a class="brand" href="/"><span class="brandmark">P2</span><span>PCB2<span class="brand-sub">KEYPAD STUDIO</span></span></a><span class="connection" id="connection" role="status"><i></i>連線中</span><button class="quiet" id="reconnect">重新連線</button></header>
+<header class="topbar"><a class="brand" href="/"><span class="brandmark">P2</span><span>PCB2<span class="brand-sub">KEYPAD STUDIO</span></span></a><span class="connection" id="connection" role="status"><i></i>連線中</span><button class="quiet" id="reconnect">重新連線</button><button class="quiet" id="preview-close" hidden>結束預覽</button></header>
 <main>
   <div class="heading"><div><p class="eyebrow">YOUR FOUR KEYS, YOUR WAY</p><h1>四鍵控制台<span class="dot">.</span></h1><p class="subtitle">按鍵、燈光與聲音，都在這裡設定。</p></div><div class="heading-actions"><span id="save-state">尚未讀取裝置</span><button class="button primary" id="save">保存到裝置 <span>↗</span></button></div></div>
   <div class="offline" id="offline" hidden><strong>尚未連上鍵盤</strong><span>連上 PCB2-Keypad-XXXX Wi-Fi 後，開啟 http://192.168.4.1。連線恢復時會自動更新。</span></div>
@@ -18,8 +18,13 @@
       <p class="caption">點擊預覽鍵測試 LED 與喇叭音效。實體按鍵會送出 USB 鍵盤輸入。</p>
     </section>
     <section class="panel mic-panel"><div class="panel-head"><div><span class="section-number">02</span><h2>麥克風</h2></div><span class="pill" id="mic-status">等待收音</span></div>
-      <div class="meter-value"><strong id="dbfs">—</strong><span>dBFS</span><span class="meter-label">數位音量</span></div><div class="meter"><div id="meter-fill"></div></div><div class="scale"><span>−90</span><span>−45</span><span>0</span></div>
+      <div class="meter-value"><strong id="dbfs">—</strong><span>dBFS</span><span class="meter-label" id="meter-label">原始數位音量</span></div><div class="meter"><div id="meter-fill"></div></div><div class="scale"><span>−90</span><span>−45</span><span>0</span></div>
       <canvas id="level-history" width="580" height="110" aria-label="最近音量變化"></canvas>
+      <div class="wave-head"><strong>即時聲音波形</strong><button class="quiet" id="monitor-toggle" aria-pressed="false">開始即時監測</button></div>
+      <canvas id="mic-waveform" width="580" height="140" aria-label="PCB 麥克風最近 64 毫秒的聲音波形"></canvas>
+      <div class="wave-controls"><label><input id="wave-auto" type="checkbox" checked>自動放大</label><span id="wave-scale">1×</span><span id="wave-window">64 ms · 16 kHz</span></div>
+      <div class="mic-diagnostics"><span>原始音量 <strong id="mic-raw">—</strong> dBFS</span><span>直流偏移 <strong id="mic-dc">—</strong> PCM</span><span>峰值 <strong id="mic-ac-peak">—</strong> dBFS</span></div>
+      <p class="caption monitor-note" id="monitor-note" role="status">開始後可觀察說話或拍手的反應。監測不保存錄音，不需要 SD 卡。</p>
       <label class="range-label" for="mic-gain">收音增益 <output id="gain-value">2×</output></label><input id="mic-gain" type="range" min="1" max="16" value="2"><p class="caption">增益過高會削波。音量為 dBFS，並非校準的環境分貝。</p>
     </section>
     <section class="panel"><div class="panel-head"><div><span class="section-number">03</span><h2>LED 樣態</h2></div><span class="mini-label">4 × RGB</span></div>

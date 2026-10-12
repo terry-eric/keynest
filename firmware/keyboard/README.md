@@ -2,7 +2,7 @@
 
 這個應用使用專案的 `pcb2_board` component，整合 USB HID 鍵盤、四顆 RGB LED、喇叭音效、麥克風音量與 WAV 錄音。Web App 直接放在韌體中，由 ESP32-S3 提供；連到裝置 Wi-Fi 即可操作，無需網際網路或 SD 卡。
 
-目前已完成 ESP-IDF 5.5.0 交叉編譯與軟體驗證，**尚未燒錄或在實際 PCB 上測試**。接腳沿用 2026-09-19 的 EasyEDA 保存快照，詳細對照見 [board library](../README.md)。
+目前已完成 ESP-IDF 5.5.0 交叉編譯與軟體驗證。2026-10-13 以板子上既有韌體實測麥克風取樣與瀏覽器串流；收音品質尚未通過。**本次新增的即時波形韌體尚未燒錄**。接腳沿用 2026-09-19 EasyEDA 保存快照，詳細對照見 [board library](../README.md)。
 
 ## 編譯、燒錄與開啟
 
@@ -50,10 +50,36 @@ Component Manager 會依 manifest 與 lock file 取得官方相依。本次實�
 | 同時按鍵 | 可同時按住四鍵；重複 HID usage 合併，修飾鍵合併；放開後送出 release |
 | LED | 關閉、常亮、呼吸、彩虹、按鍵漣漪、麥克風音量律動；主色、亮度與動畫速度可調 |
 | 喇叭 | Click、Chime、Retro、Bubble 四種合成音效，加靜音；四鍵不同音高，可混合四個聲部 |
-| 麥克風 | 即時音量、歷史曲線與 1–16× 數位增益；dBFS 是數位音量，不是校準的環境 dB SPL |
+| 麥克風 | 即時音量、PCM 波形、直流偏移與削波診斷、歷史曲線及 1–16× 數位增益；dBFS 不是校準的環境 dB SPL |
 | 設定保存 | 只在按下保存時寫入 NVS；錄音或裝置錄音下載期間不寫設定 |
 
 預設喇叭音量 10%、LED 亮度 64/255。網頁中的預覽鍵與「測試音效」會觸發 LED／喇叭；**USB 鍵盤輸入由實體按鍵產生**。
+
+### 即時麥克風監測
+
+在麥克風面板按「開始即時監測」，可看到最近最多 64 ms 的 PCM 波形、去除該視窗平均值後的 RMS 音量與峰值，以及原始 RMS 和直流偏移。每次請求結束後約 100 ms 再取得下一個視窗；實際更新率受 Wi-Fi 延遲影響，這些視窗不是完整、連續的錄音。超過 1 秒沒有新資料時會清空波形與音量，不顯示舊樣本。
+
+波形預設自動放大，倍率顯示在下方；取消勾選可看完整 PCM 範圍。移除偏移與放大只影響監測顯示，原始音訊、錄音、增益與 LED 音量律動不變。
+
+新增韌體使用固定 2 KiB RAM 保存最新樣本，`GET /api/microphone` 不消耗錄音串流；多個頁面可各自查看，可同時錄到任何目的地。停止監測只停止網頁請求，不寫入 SD、Flash 或 NVS。
+
+### 未更新韌體時的本機相容預覽
+
+先將電腦連到 PCB Wi-Fi，再從專案根目錄執行：
+
+```powershell
+python tools/preview-keypad.py
+```
+
+開啟 `http://127.0.0.1:8028`，按「開始即時監測」。伺服器僅綁定本機，不使用電腦的麥克風。舊韌體透過 owner ID 保護的「瀏覽器」暫存串流提供真實 PCM；工具不產生 WAV 或寫音訊到磁碟、SD、Flash。串流达到裝置時間上限時重新開始，換段可能短暫中斷。停止監測或頁面在背景約 2 秒後釋放串流。相容預覽期間請先停止監測，再錄音、保存設定或掛載 SD；其他錄音作業正在進行時，工具會拒絕啟動預覽。
+
+Windows 可由工具建立暫存 Wi-Fi 設定並在結束時恢復原本設定檔；請將 SSID 與原本設定檔名稱替換成實際值：
+
+```powershell
+python tools/preview-keypad.py --wifi-ssid PCB2-Keypad-XXXX --restore-profile ORIGINAL_PROFILE
+```
+
+板子預設密碼為 `pcb2play`，非預設密碼可透過 `--wifi-password` 指定。按網頁「結束預覽」或終端 Ctrl+C 正常結束；全部頁面關閉、連續 10 分鐘沒有請求時亦自動結束。正常結束會移除工具建立的暫存設定。若期間已手動切換網路，保留該手動選擇。直接強制終止程序無法執行清理流程。
 
 映射使用 USB HID usage，實際輸出的字元由電腦鍵盤布局決定。每鍵是一個 usage 加修飾鍵，沒有文字巨集。映射「停用」且取消修飾鍵可完全停用該鍵的 USB 輸入；若保留修飾鍵，仍可作為單獨的 Ctrl 等按鍵使用。
 
@@ -97,6 +123,7 @@ Component Manager 會依 manifest 與 lock file 取得官方相依。本次實�
 | `main/app_logic.c` | 可在主機測試的 HID 報告、效果、PCM、WAV、CRC 邏輯 |
 | `main/usb_keyboard.c` | TinyUSB HID + CDC 描述符與按鍵報告 |
 | `main/audio_worker.c` | I²S 收音、音效混音、音量與降採樣 |
+| `main/mic_monitor.c` | 最新 PCM 視窗及不消耗資料的監測讀取 |
 | `main/recorder.c` | 錄音狀態、佇列、瀏覽器串流、SD WAV 與下載互斥 |
 | `main/flash_store.c` | Flash 雙 slot、CRC、提交與恢復 |
 | `main/web_server.c` | Wi-Fi AP、HTTP API 與內嵌網頁 |
@@ -111,6 +138,7 @@ Component Manager 會依 manifest 與 lock file 取得官方相依。本次實�
 | 方法／路徑 | 內容 |
 |---|---|
 | `GET /api/state` | 設定、按鍵、音量、USB 與錄音狀態 |
+| `GET /api/microphone` | 最新最多 1024 個 PCM16 LE 樣本；`X-PCB2-Sample-Rate` 為 16000、`X-PCB2-Frames` 為累計樣本數、`X-PCB2-Age-Ms` 為資料年齡；無新樣本或超過 1 秒回傳 503 |
 | `POST /api/config` | 完整設定交易，需包含下面全部九個欄位 |
 | `POST /api/save` | `{}`，寫入 NVS |
 | `POST /api/trigger` | `{"key":0}`，0–3；測試 LED／音效 |

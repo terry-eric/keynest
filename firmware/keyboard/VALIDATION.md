@@ -2,6 +2,28 @@
 
 日期：2026-10-05。此紀錄區分實際交叉編譯、主機軟體測試、Web 展示模式與待實機驗證項目。
 
+## 2026-10-13：即時波形與麥克風測試
+
+- 即時波形韌體成功交叉編譯，新增 `mic_monitor.c` 與 `GET /api/microphone`。靜態 RAM 57,692 bytes；最終 app 使用量見新建置紀錄及 manifest。**本次未燒錄該版本**。
+- Production PCM 視窗經主機測試：正負樣本順序、超過 1024 樣本時保留最新資料、短讀、零容量、時間戳記與多個讀者不消耗樣本均通過。主機模擬不驗證 ESP32 上的 critical section 時間或跨核心競爭。
+- JavaScript 測試通過：DC-only 不產生假 AC 音量、正負 PCM、已知 AC RMS、削波、錯誤取樣率／長度／計數／過期資料拒絕，並保留既有 WAV 測試。
+- 本機相容預覽測試通過：新版直接唯讀、舊版讀取與 owner 清理、拒絕搶占進行中的錄音、遺失樣本時停止，以及不停止其他 owner 的錄音。
+- Web 展示模式檢查波形、去除偏移後音量、倍率、停止／重啟；390 × 844 手機畫面沒有水平溢出。展示使用合成音訊，不能證明真實收音。
+- 在實際 PCB 的既有韌體上，20 秒 USB telemetry 約 47,999 樣本／秒，讀取錯誤與逾時增量均為 0。說話／拍手測試的原始 meter 僅落在 −36.10 至 −36.04 dBFS。
+- 另以「瀏覽器」目的地接收 161,834 個 PCM 樣本，產生 10.114625 秒 mono／16 kHz／PCM16 WAV，dropped frames 為 0；未寫 SD 或裝置 Flash。原本 Wi-Fi 已在該錄音測試後恢復。
+- WAV 原始 RMS 約 −37.18 dBFS，平均偏移 +453.55 PCM；扣除平均值的 AC RMS 約 −72.95 dBFS。**取樣／傳輸成功，收音品質尚未通過；軟體解碼或硬體原因尚未定位。** 錄音與原始測試資料僅留在本機 `.tools/`，沒有加入 GitHub。
+
+新增測試：
+
+```sh
+node tools/test-keypad-web.cjs
+python tools/test-keypad-preview.py
+gcc -std=c11 -Wall -Wextra -Itools/monitor-test-includes tools/test-mic-monitor.c firmware/keyboard/main/mic_monitor.c -o mic-monitor-test
+./mic-monitor-test
+```
+
+手機畫面：[即時波形展示](validation/mic-realtime-mobile.png)。以下保留 2026-10-05 原始版本驗證紀錄；其「尚未實機測試」敘述指該次工作。
+
 ## 建置通過
 
 - 執行 `tools/build.ps1 -Keyboard`，以 PlatformIO 6.2.0／espressif32 6.12.0 呼叫 ESP-IDF 5.5.0、Xtensa GCC 14.2.0，結果 SUCCESS。
