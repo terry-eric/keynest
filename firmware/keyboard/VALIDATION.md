@@ -2,6 +2,16 @@
 
 日期：2026-10-05。此紀錄區分實際交叉編譯、主機軟體測試、Web 展示模式與待實機驗證項目。
 
+## 2026-10-13：USB 控制與波形傳輸
+
+- ESP-IDF 5.5.0 交叉編譯成功，無 compiler warning／error；USB CDC RX 2048 bytes、TX 8192 bytes 已核對生成的 `sdkconfig.h`。靜態 RAM 66,932 bytes；新 app 1,061,153 bytes，image 1,061,680 bytes。esptool 確認 checksum 與 image hash 有效。
+- 新增 USB CDC JSON RPC，與 HTTP 共用設定驗證與狀態；支援設定、按鍵效果、即時 PCM、三種錄音目的地及裝置 WAV 下載。PCM 附 Base64、長度與 CRC32。
+- `python tools/test-keypad-usb.py` 的 11 個測試通過：任意切包與混合日誌、忽略舊回應、開埠不要求 reset、設定只傳一次、帶正負 PCM 的 CRC、異常音訊與 metadata 拒絕、錄音 owner、HTTP status、協定版本、裝置選擇，以及下載完成／錯誤清理。
+- 既有本機相容預覽 5 個測試及 Web PCM／WAV 測試通過。USB 網頁顯示 USB 連線提示，USB 模式拒絕 Wi-Fi 切換參數；程式不呼叫 Wi-Fi 管理命令。
+- 實際 USB 埠已確認；舊韌體不回應 RPC，也無法經 esptool 自動進入下載模式。**新版待手動 BOOT／RESET 後燒錄與實機驗證**。主機測試不代表實體 USB 吞吐與收音品質已通過。
+
+新增測試：`python tools/test-keypad-usb.py`。
+
 ## 2026-10-13：即時波形與麥克風測試
 
 - 即時波形韌體成功交叉編譯，新增 `mic_monitor.c` 與 `GET /api/microphone`。靜態 RAM 57,692 bytes；最終 app 使用量見新建置紀錄及 manifest。**本次未燒錄該版本**。

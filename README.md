@@ -6,7 +6,7 @@
 - 四顆 RGB LED，六種樣態，可調色、亮度與速度。
 - NS4168 喇叭四種合成音效與音量控制。
 - ICS-43434 麥克風即時音量、PCM 波形、直流偏移診斷、數位增益與 WAV 錄音。
-- 裝置透過 Wi-Fi 提供 Web App，不需網際網路或 SD 卡。
+- Web App 可透過 USB 本機工具或裝置 Wi-Fi 控制，不需網際網路或 SD 卡。
 
 | 錄音目的地 | 預設上限 | 保存方式 |
 |---|---:|---|
@@ -30,6 +30,8 @@
 
 裝置開機後，連接 Wi-Fi `PCB2-Keypad-XXXX`（預設密碼 `pcb2play`），開啟 `http://192.168.4.1`。按「套用變更」生效，按「保存到裝置」才會在重開機後保留。
 
+電腦要保持原本 Wi-Fi 時，燒錄新版後以 USB 連接 PCB，執行 `python tools/preview-keypad.py --usb --idle-timeout 3600`，開啟 `http://127.0.0.1:8028`。此方式支援真實音量、波形、增益與全部控制／錄音功能；需安裝 `pyserial`。舊版只輸出 USB 診斷日誌，必須更新韌體。
+
 完整編譯、燒錄、USB、錄音與 API 說明見 [鍵盤應用文件](firmware/keyboard/README.md)。底層接腳與 component API 見 [board library 文件](firmware/README.md)。
 
 ## Web App 預覽
@@ -46,7 +48,7 @@ python -m http.server 8027 --bind 127.0.0.1 --directory firmware/keyboard/main/w
 
 ## 驗證與硬體依據
 
-2026-10-13 已完成即時波形版本的交叉編譯、主機測試與網頁展示驗證。另以實際 PCB 上的既有韌體驗證麥克風取樣及免 SD 的 WAV 串流；收音有明顯直流偏移、聲音偏弱，品質尚未通過。**新增波形韌體尚未燒錄**。接腳依 2026-09-19 EasyEDA 保存快照。詳細結果與待實機測試項目見 [驗證紀錄](firmware/keyboard/VALIDATION.md)。
+2026-10-13 已完成 USB 控制與即時波形版本的交叉編譯、主機測試與網頁展示驗證。另以實際 PCB 上的既有韌體驗證麥克風取樣及免 SD 的 WAV 串流；收音有明顯直流偏移、聲音偏弱，品質尚未通過。新版 USB 實機驗證狀態見 [驗證紀錄](firmware/keyboard/VALIDATION.md)。接腳依 2026-09-19 EasyEDA 保存快照。
 
 - [硬體接腳證據](hardware/evidence/hardware-map.json)
 - [已建置韌體](firmware/artifacts/keyboard/)及 [SHA-256 manifest](firmware/artifacts/keyboard/manifest.json)

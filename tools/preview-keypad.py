@@ -16,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.request import Request, build_opener, ProxyHandler
 from xml.sax.saxutils import escape
+from keypad_usb import UsbDevice, DeviceError
 
 WEB = Path(__file__).resolve().parents[1] / "firmware/keyboard/main/web"
 CONTROL = {"Content-Type": "application/json", "X-PCB2-Control": "1"}
@@ -181,6 +182,8 @@ class Wifi:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--device", default="http://192.168.4.1")
+    parser.add_argument("--usb", action="store_true", help="Use PCB USB CDC; never change Wi-Fi")
+    parser.add_argument("--usb-port", help="Override automatic PCB USB port detection")
     parser.add_argument("--port", type=int, default=8028)
     parser.add_argument("--wifi-ssid")
     parser.add_argument("--wifi-password", default="pcb2play")
@@ -188,9 +191,13 @@ def main():
     parser.add_argument("--restore-profile")
     parser.add_argument("--idle-timeout", type=int, default=600)
     args = parser.parse_args()
+    if args.usb and (args.wifi_ssid or args.restore_profile):
+        parser.error("--usb cannot be combined with Wi-Fi switching options")
+    if args.usb_port and not args.usb:
+        parser.error("--usb-port requires --usb")
     if args.wifi_ssid and not args.restore_profile:
         parser.error("--wifi-ssid requires --restore-profile to restore your connection on exit")
-    device = Device(args.device)
+    device = UsbDevice(args.usb_port) if args.usb else Device(args.device)
     preview = Preview(device)
     wifi = Wifi(args)
 
@@ -206,7 +213,10 @@ def main():
                 if key.lower() in {"content-type", "content-disposition"} or key.lower().startswith("x-pcb2-"):
                     self.send_header(key, value)
             self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass  # The browser may cancel a request when leaving the page.
 
         def dispatch(self):
             self.server.last_request = time.monotonic()
@@ -219,7 +229,7 @@ def main():
                     state = device.json(path)
                     preview.native = bool(state.get("mic_preview"))
                     state.update(mic_preview=True, mic_preview_legacy=not preview.native, local_preview=True,
-                                 preview_wifi_managed=bool(args.wifi_ssid))
+                                 preview_wifi_managed=bool(args.wifi_ssid), transport="usb" if args.usb else "wifi")
                     if preview.active:
                         state["recording"].update(state=0, frames=0, duration_ms=0, error="", dropped_frames=0)
                     return self.reply(200, json.dumps(state).encode(), {"Content-Type": "application/json"})
@@ -247,6 +257,8 @@ def main():
                 self.reply(404, b'{}', {"Content-Type": "application/json"})
             except HTTPError as error:
                 self.reply(error.code, error.read(), dict(error.headers))
+            except DeviceError as error:
+                self.reply(error.status, json.dumps({"error": str(error)}).encode(), {"Content-Type": "application/json"})
             except (OSError, ValueError, RuntimeError, KeyError) as error:
                 status = 409 if isinstance(error, ValueError) else 503
                 self.reply(status, json.dumps({"error": str(error)}).encode(), {"Content-Type": "application/json"})
@@ -264,7 +276,8 @@ def main():
                 break
 
     try:
-        wifi.connect()
+        if not args.usb:
+            wifi.connect()
         threading.Thread(target=expire, daemon=True).start()
         print(f"PCB2 local preview: http://127.0.0.1:{args.port}", flush=True)
         server.serve_forever(poll_interval=.1)
@@ -273,8 +286,11 @@ def main():
     finally:
         preview.close()
         server.server_close()
-        wifi.close()
-        print("Preview closed; managed Wi-Fi profile removed.", flush=True)
+        if args.usb:
+            device.close()
+        else:
+            wifi.close()
+        print("Preview closed.", flush=True)
 
 
 if __name__ == "__main__":

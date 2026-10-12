@@ -151,7 +151,7 @@ function initialize() {
   }
   function targetHelp() {
     const target=$("record-target").value,r=state?.recording;
-    $("target-help").textContent=target==="browser"?`不用 SD 卡，最長 ${r?.limit_seconds||60} 秒。請保持網頁開啟與 Wi-Fi 連線，完成後下載 WAV。`:target==="flash"?`先錄入 RAM，停止後寫入內建 Flash。最多 ${(r?.flash_limit_seconds||2.048).toFixed(2)} 秒；保存最新一段，重開機後可下載。`:`最長 ${r?.limit_seconds||60} 秒，建立新 WAV，不覆蓋舊檔。${r?.sd_ready?"microSD 已就緒。":"目前沒有可用的 microSD。"}`;
+    $("target-help").textContent=target==="browser"?`不用 SD 卡，最長 ${r?.limit_seconds||60} 秒。請保持網頁開啟與 ${state?.transport==="usb"?"USB":"Wi-Fi"} 連線，完成後下載 WAV。`:target==="flash"?`先錄入 RAM，停止後寫入內建 Flash。最多 ${(r?.flash_limit_seconds||2.048).toFixed(2)} 秒；保存最新一段，重開機後可下載。`:`最長 ${r?.limit_seconds||60} 秒，建立新 WAV，不覆蓋舊檔。${r?.sd_ready?"microSD 已就緒。":"目前沒有可用的 microSD。"}`;
     controls();
   }
   function render(next) {
@@ -169,7 +169,7 @@ function initialize() {
     $("record-error").textContent=r.error || captureError || (r.dropped_frames?"資料遺失，請重新錄音。":"");
     $("flash-status").textContent=r.flash_ready?"內建 Flash 可用":"Flash 尚未就緒";$("sd-status").textContent=r.mounting?"SD 掛載中":r.sd_ready?"microSD 已就緒":"microSD 未掛載（可免卡錄音）";
     $("device-download").textContent=r.filename?"↓ 下載 "+r.filename:"↓ 裝置尚無保存的錄音";
-    $("device-address").textContent=(demo?"展示模式":next.ssid+" · "+next.ip)+" · 離線控制頁面";targetHelp();
+    $("device-address").textContent=(demo?"展示模式":next.transport==="usb"?"USB 連線 · 電腦維持原本 Wi-Fi":next.ssid+" · "+next.ip)+" · 離線控制頁面";targetHelp();
   }
   function drawHistory() {
     const canvas=$("level-history"),ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
@@ -265,7 +265,7 @@ function initialize() {
       while(capture===session) {
         const packet=await audioResponse(session.owner);const count=validateAudioChunk(packet.buffer);
         if(count){session.chunks.push(packet.buffer);session.frames+=count;}
-        if(packet.dropped)throw new Error("錄音資料遺失，請保持 Wi-Fi 連線後重新錄音。");
+        if(packet.dropped)throw new Error(`錄音資料遺失，請保持 ${state?.transport==="usb"?"USB":"Wi-Fi"} 連線後重新錄音。`);
         if([0,4].includes(packet.state)&&!count) {
           if(packet.state===4||session.frames!==packet.frames)throw new Error("錄音未完整接收，請重新錄音。");
           if(!session.frames)throw new Error("沒有收到收音資料。");
@@ -274,7 +274,7 @@ function initialize() {
           $("browser-download").href=downloadURL;$("browser-download").download="PCB2-"+Date.now()+".wav";$("browser-download").classList.remove("disabled");
           toast("錄音完成，可下載到手機或電腦。");break;
         }
-        await new Promise(resolve=>setTimeout(resolve,40));
+        await new Promise(resolve=>setTimeout(resolve,state?.transport==="usb"?10:40));
       }
     } catch(error) {
       captureError=error.message;$("record-error").textContent=captureError;toast(captureError,true);

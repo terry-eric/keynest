@@ -16,7 +16,7 @@
     {
       "path": "bootloader.bin",
       "bytes": 21376,
-      "sha256": "6d17e8c8f186515848b2f20b266a41a901d9c0fb8b7a85b9a25b6b77faa0e18d",
+      "sha256": "cdba4bd3757a24d2adcd49c71d331578eac7b4b5ed0de5531ec566fcaf517570",
       "flash_offset": "0x0"
     },
     {
@@ -27,14 +27,14 @@
     },
     {
       "path": "firmware.bin",
-      "bytes": 1058272,
-      "sha256": "d006e138429f94b67495618c611e84cbb409b5df5670a72035a8ff8111b48b09",
+      "bytes": 1061680,
+      "sha256": "2938652980fdcfcd753024805e76d16d4946e9ceec03a2cd143f995fdccfad86",
       "flash_offset": "0x10000"
     },
     {
       "path": "firmware.elf",
-      "bytes": 10801148,
-      "sha256": "df9bc9ed5a2b98722e089b5371af99e0c6f1c9b531573e53a1ec277df58d37f0"
+      "bytes": 10823800,
+      "sha256": "268e227d379e2469f5453964dd0054f84254458e233e80260327180020ac043c"
     }
   ],
   "sources": [
@@ -88,7 +88,7 @@
     },
     {
       "path": "firmware/keyboard/main/CMakeLists.txt",
-      "sha256": "002cd6781ebae869c626965c8dc79075131dea68b13f3feff7165a529263acf5"
+      "sha256": "75936a270ca012751888e994367c03ca199ab432a8811f32fc531faeaa1309f8"
     },
     {
       "path": "firmware/keyboard/main/Kconfig.projbuild",
@@ -97,6 +97,10 @@
     {
       "path": "firmware/keyboard/main/app.h",
       "sha256": "9a255ee4633968229660ca8acff05fa4b5123298c6d69bf6c216795444161d3a"
+    },
+    {
+      "path": "firmware/keyboard/main/app_api.h",
+      "sha256": "912cfa88568167045dbc9bf40cd4b8a96bdc5b334bf10434cf752a9d99a76bd0"
     },
     {
       "path": "firmware/keyboard/main/app_logic.c",
@@ -147,16 +151,20 @@
       "sha256": "8efece1ce3fc471f7b43af1925237c7fe01cb1d1b085a76b1f01fe6f49c9a8fe"
     },
     {
+      "path": "firmware/keyboard/main/usb_control.c",
+      "sha256": "1ea3d81a5b5dd2ef854c054c5cad986b4c173b704afdba4374987aed47a5ef10"
+    },
+    {
       "path": "firmware/keyboard/main/usb_keyboard.c",
-      "sha256": "9cee5ad5b69d541f993195666fd71e77eba64537685709f394a5a64e06091811"
+      "sha256": "f6e5731408e82fd6483b49ee82c771958ad49102362885896b2416a5d2a7944b"
     },
     {
       "path": "firmware/keyboard/main/web/app.js",
-      "sha256": "d64d283880919891a27119af24df2a4abb37d16f162f973684663d7da86dfbfc"
+      "sha256": "62032e72f21a7627dc8a0df1331a0f7514e840f4dfd5cb99983fd722ca018f12"
     },
     {
       "path": "firmware/keyboard/main/web/index.html",
-      "sha256": "962274b6b68f0edcd853da3b6c625503403b829a3526fd612253e5eb155bd37d"
+      "sha256": "239abb521bf709098b7fd51b84a0e6f8681e84b2f6a24c56dacdf55afef2a37d"
     },
     {
       "path": "firmware/keyboard/main/web/style.css",
@@ -164,7 +172,7 @@
     },
     {
       "path": "firmware/keyboard/main/web_server.c",
-      "sha256": "6bfe8e8efa27ac12d05ada98754e56867badb3731f3a7a95ddf52c309c30e40b"
+      "sha256": "296859b890cd24154e2655e686def67b832249cf3b4c28a335409c02291808d8"
     },
     {
       "path": "firmware/keyboard/partitions.csv",
@@ -176,7 +184,7 @@
     },
     {
       "path": "firmware/keyboard/sdkconfig.defaults",
-      "sha256": "5988ca0dc93791082fe22d26020411a6275b46b5803da54e8ba9aa8042a65844"
+      "sha256": "be4d3cde0a5a1148206571e1b5a84a4acb48519436837de4c95bd44d80e733cf"
     }
   ]
 }

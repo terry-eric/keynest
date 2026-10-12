@@ -1,4 +1,5 @@
 #include "app.h"
+#include "app_api.h"
 #include "tinyusb.h"
 #include "tusb_cdc_acm.h"
 #include "tusb_console.h"
@@ -53,8 +54,9 @@ esp_err_t usb_keyboard_start(void) {
     };
     err = tinyusb_driver_install(&config);
     if (err != ESP_OK) return err;
-    tinyusb_config_cdcacm_t cdc = {.usb_dev = TINYUSB_USBDEV_0, .cdc_port = TINYUSB_CDC_ACM_0, .rx_unread_buf_sz = 64};
+    tinyusb_config_cdcacm_t cdc = {.usb_dev = TINYUSB_USBDEV_0, .cdc_port = TINYUSB_CDC_ACM_0, .rx_unread_buf_sz = 2048};
     err = tusb_cdc_acm_init(&cdc);
     if (err == ESP_OK) err = esp_tusb_init_console(TINYUSB_CDC_ACM_0);
+    if (err == ESP_OK) err = usb_control_start();
     return err;
 }

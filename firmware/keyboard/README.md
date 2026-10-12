@@ -2,7 +2,7 @@
 
 這個應用使用專案的 `pcb2_board` component，整合 USB HID 鍵盤、四顆 RGB LED、喇叭音效、麥克風音量與 WAV 錄音。Web App 直接放在韌體中，由 ESP32-S3 提供；連到裝置 Wi-Fi 即可操作，無需網際網路或 SD 卡。
 
-目前已完成 ESP-IDF 5.5.0 交叉編譯與軟體驗證。2026-10-13 以板子上既有韌體實測麥克風取樣與瀏覽器串流；收音品質尚未通過。**本次新增的即時波形韌體尚未燒錄**。接腳沿用 2026-09-19 EasyEDA 保存快照，詳細對照見 [board library](../README.md)。
+目前已完成 ESP-IDF 5.5.0 交叉編譯與軟體驗證。2026-10-13 以板子上既有韌體實測麥克風取樣與瀏覽器串流；收音品質尚未通過。新增 USB 控制與即時波形的實機驗證狀態見 [VALIDATION.md](VALIDATION.md)。接腳沿用 2026-09-19 EasyEDA 保存快照，詳細對照見 [board library](../README.md)。
 
 ## 編譯、燒錄與開啟
 
@@ -29,6 +29,21 @@ helper 使用 PlatformIO 作為 ESP-IDF 的建置工具，將含空白的 Window
 5. 在「錄音與保存」選擇目的地，按開始／停止，再下載 WAV。
 
 Wi-Fi 名稱、密碼與錄音時間上限可在 `menuconfig → PCB2 Keypad` 修改。預設為 WPA2 AP、頻道 6，最多四個 Wi-Fi 用戶端。沒有 captive portal，請直接輸入上述 IP。
+
+### USB 控制：電腦保持原本 Wi-Fi
+
+燒錄此版韌體後，使用資料線連接 PCB，再執行：
+
+```powershell
+python -m pip install pyserial
+python tools/preview-keypad.py --usb --idle-timeout 3600
+```
+
+開啟 `http://127.0.0.1:8028`，即可調整鍵盤、燈光、音效、1–16× 麥克風增益與錄音目的地，並查看即時音量和波形。工具自動找出 VID `303A`／PID `4005` 的 USB CDC 埠；有多個相同裝置時可加 `--usb-port COMx` 指定。USB 模式不呼叫 Wi-Fi 管理命令，也不重置板子。
+
+USB 與 HID 鍵盤共存。監測讀取最新 PCM 視窗，不占用錄音 session；可以同時錄到瀏覽器、內建 Flash 或 SD。選「瀏覽器」時音訊只在工具與瀏覽器 RAM 中傳送，完成後由瀏覽器下載 WAV。Flash／SD 下載也走 USB；工具不另存音訊。關閉工具會釋放 COM 埠，沒有工具時仍可使用板子 Wi-Fi。
+
+舊韌體只輸出診斷日誌，不能經 USB 控制或取得波形；工具會顯示離線，需先更新韌體。
 
 ### 使用既有 ESP-IDF 環境
 
@@ -89,7 +104,7 @@ python tools/preview-keypad.py --wifi-ssid PCB2-Keypad-XXXX --restore-profile OR
 
 | 目的地 | 預設上限 | 保存方式 | 無 SD 卡可用 |
 |---|---:|---|---|
-| 瀏覽器（預設） | 60 秒 | Wi-Fi 傳送 PCM，在瀏覽器組成 WAV，再下載到手機／電腦 | 是 |
+| 瀏覽器（預設） | 60 秒 | USB 或 Wi-Fi 傳送 PCM，在瀏覽器組成 WAV，再下載到手機／電腦 | 是 |
 | 內建 Flash | 2.048 秒 | 先錄入 64 KiB RAM；停止後保存裝置最新一段，重開機後可下載 | 是 |
 | microSD（選用） | 60 秒 | 建立 `REC00001.WAV` 等新檔，不覆蓋既有檔案 | 否 |
 
@@ -99,7 +114,7 @@ python tools/preview-keypad.py --wifi-ssid PCB2-Keypad-XXXX --restore-profile OR
 
 ### 瀏覽器錄音
 
-錄音期間請保持頁面在前景與 Wi-Fi 連線。裝置的串流緩衝約 512 ms；網路中斷或瀏覽器讀取太慢時會停止並回報資料遺失，不提供看似完整的損壞錄音。完成後按「下載本次瀏覽器錄音」。重新整理或關閉網頁會失去尚未下載的瀏覽器錄音。
+錄音期間請保持頁面在前景與 USB／Wi-Fi 連線。裝置的串流緩衝約 512 ms；傳輸中斷或瀏覽器讀取太慢時會停止並回報資料遺失，不提供看似完整的損壞錄音。完成後按「下載本次瀏覽器錄音」。重新整理或關閉網頁會失去尚未下載的瀏覽器錄音。
 
 串流有每次錄音的 owner ID，其他頁面無法拿走該段的 PCM。目的地每次錄音前可選；錄音進行中先停止，才可切換。
 
@@ -122,6 +137,7 @@ python tools/preview-keypad.py --wifi-ssid PCB2-Keypad-XXXX --restore-profile OR
 | `main/app_main.c`、`controller.c` | 初始化、NVS 設定、按鍵輪詢、LED 工作 |
 | `main/app_logic.c` | 可在主機測試的 HID 報告、效果、PCM、WAV、CRC 邏輯 |
 | `main/usb_keyboard.c` | TinyUSB HID + CDC 描述符與按鍵報告 |
+| `main/usb_control.c`、`app_api.h` | USB CDC 命令、監測 PCM 與錄音傳輸；與 HTTP 共用狀態和控制邏輯 |
 | `main/audio_worker.c` | I²S 收音、音效混音、音量與降採樣 |
 | `main/mic_monitor.c` | 最新 PCM 視窗及不消耗資料的監測讀取 |
 | `main/recorder.c` | 錄音狀態、佇列、瀏覽器串流、SD WAV 與下載互斥 |
@@ -182,3 +198,9 @@ python -m http.server 8027 --bind 127.0.0.1 --directory firmware/keyboard/main/w
 - [官方 TinyUSB HID 範例](https://github.com/espressif/esp-idf/tree/v5.5/examples/peripherals/usb/device/tusb_hid)及 [CDC console 範例](https://github.com/espressif/esp-idf/tree/v5.5/examples/peripherals/usb/device/tusb_console)
 
 固定相依版本：ESP-IDF 5.5.0、`esp_tinyusb` 1.7.6~2、`tinyusb` 0.17.0~2、`led_strip` 3.0.3。
+
+### USB CDC 協定
+
+請求是 `PCB2? ` 後接單行 JSON（`id`、`path`、選用的 `body`），以 LF 結束；最多 1699 bytes，不含 LF。回應是 `PCB2_RPC ` 後接 JSON，含 `id`、`protocol:1`、`status` 和 `data`／`error`。介面使用 DTR=true、RTS=false；不要同時使用串列監看工具占用埠。
+
+狀態與設定命令沿用上述 `/api/` 路徑。麥克風與瀏覽器錄音資料以 Base64 編碼 PCM，附 `bytes`、標準 CRC32 和樣本 metadata；接收端拒絕長度、CRC 或過期資訊不符的音訊。裝置檔案下載使用 `/api/file/begin`、`read`、`end`；2 秒沒有新讀取會釋放下載 session。傳輸出錯不自動重送有副作用的控制命令，以免重複觸發或錄音。

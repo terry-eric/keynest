@@ -1,4 +1,5 @@
 #include "app.h"
+#include "app_api.h"
 #include "recorder.h"
 #include "mic_monitor.h"
 #include "esp_http_server.h"
@@ -52,10 +53,10 @@ static cJSON *config_json(const keypad_config_t *c) {
     add_bytes(json, "color", c->color, 3); add_bytes(json, "keycodes", c->keycodes, 4); add_bytes(json, "modifiers", c->modifiers, 4);
     return json;
 }
-static esp_err_t state_get(httpd_req_t *req) {
+cJSON *app_state_json(void) {
     app_snapshot_t state; app_snapshot(&state);
     recorder_status_t recording; recorder_snapshot(&recording);
-    cJSON *json = cJSON_CreateObject(); if (!json) return json_response(req, NULL);
+    cJSON *json = cJSON_CreateObject(); if (!json) return NULL;
     cJSON_AddStringToObject(json, "device", "PCB2 Keypad"); cJSON_AddStringToObject(json, "ssid", ap_name);
     cJSON_AddStringToObject(json, "ip", "192.168.4.1"); cJSON_AddNumberToObject(json, "uptime_ms", esp_timer_get_time() / 1000);
     cJSON_AddBoolToObject(json, "usb_connected", usb_keyboard_connected()); cJSON_AddNumberToObject(json, "keys", state.keys);
@@ -77,7 +78,10 @@ static esp_err_t state_get(httpd_req_t *req) {
         cJSON_AddNumberToObject(rec, "flash_limit_seconds", (double)FLASH_CAPTURE_FRAMES / CAPTURE_RATE);
         cJSON_AddStringToObject(rec, "filename", recording.filename); cJSON_AddStringToObject(rec, "error", recording.error);
     }
-    return json_response(req, json);
+    return json;
+}
+static esp_err_t state_get(httpd_req_t *req) {
+    return json_response(req, app_state_json());
 }
 static bool fields_match(cJSON *root, const char *const *allowed, unsigned count) {
     if (!cJSON_IsObject(root)) return false;
@@ -140,16 +144,15 @@ static cJSON *read_body(httpd_req_t *req) {
     if (!cJSON_IsObject(json)) { cJSON_Delete(json); json_error(req, "400 Bad Request", "Invalid JSON object"); return NULL; }
     return json;
 }
-static esp_err_t command_post(httpd_req_t *req) {
-    cJSON *body = read_body(req); if (!body) return ESP_FAIL; // Close unread/malformed request bodies.
+esp_err_t app_command_execute(const char *path, cJSON *body) {
     esp_err_t result = ESP_ERR_INVALID_ARG;
-    if (!strcmp(req->uri, "/api/config")) {
+    if (!strcmp(path, "/api/config")) {
         keypad_config_t config;
         if (parse_config(body, &config)) result = app_apply_config(&config);
-    } else if (!strcmp(req->uri, "/api/trigger")) {
+    } else if (!strcmp(path, "/api/trigger")) {
         const char *const fields[] = {"key"}; uint8_t key;
         if (fields_match(body, fields, 1) && number(cJSON_GetObjectItemCaseSensitive(body, "key"), 0, 3, &key)) result = app_trigger_key(key);
-    } else if (!strcmp(req->uri, "/api/record")) {
+    } else if (!strcmp(path, "/api/record")) {
         const char *const fields[] = {"action", "target", "owner"}; cJSON *action = cJSON_GetObjectItemCaseSensitive(body, "action");
         if (fields_match(body, fields, 3) && cJSON_IsString(action)) {
             if (!strcmp(action->valuestring, "stop")) result = recorder_stop();
@@ -163,8 +166,13 @@ static esp_err_t command_post(httpd_req_t *req) {
                 }
             }
         }
-    } else if (!strcmp(req->uri, "/api/save") && fields_match(body, NULL, 0)) result = app_save_config();
-    else if (!strcmp(req->uri, "/api/sd") && fields_match(body, NULL, 0)) result = recorder_retry_mount();
+    } else if (!strcmp(path, "/api/save") && fields_match(body, NULL, 0)) result = app_save_config();
+    else if (!strcmp(path, "/api/sd") && fields_match(body, NULL, 0)) result = recorder_retry_mount();
+    return result;
+}
+static esp_err_t command_post(httpd_req_t *req) {
+    cJSON *body = read_body(req); if (!body) return ESP_FAIL; // Close unread/malformed request bodies.
+    esp_err_t result = app_command_execute(req->uri, body);
     cJSON_Delete(body);
     if (result == ESP_ERR_INVALID_ARG) return json_error(req, "400 Bad Request", "Invalid or unknown fields");
     return operation_response(req, result);
