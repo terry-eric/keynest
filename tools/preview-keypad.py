@@ -236,10 +236,10 @@ def main():
                 if self.command == "GET" and path == "/api/microphone":
                     pcm, headers = preview.read()
                     return self.reply(200, pcm, headers)
-                if self.command == "GET" and path in ("/api/audio", "/api/recording.wav"):
-                    pcm, headers = device.request(path, headers={"X-PCB2-Recording": self.headers.get("X-PCB2-Recording", "")})
+                if self.command == "GET" and path in ("/api/audio", "/api/recording.wav", "/api/sd/files", "/api/sd/recording.wav"):
+                    pcm, headers = device.request(self.path if path == "/api/sd/recording.wav" else path, headers={"X-PCB2-Recording": self.headers.get("X-PCB2-Recording", "")})
                     return self.reply(200, pcm, headers)
-                if self.command == "POST" and path in ("/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/microphone/channel", "/api/preview/close"):
+                if self.command == "POST" and path in ("/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/microphone/channel", "/api/sound/begin", "/api/sound/chunk", "/api/sound/commit", "/api/sound/cancel", "/api/device/restart", "/api/preview/close"):
                     if self.headers.get("X-PCB2-Control") != "1":
                         return self.reply(403, b'{"error":"Missing control header"}', {"Content-Type": "application/json"})
                     size = int(self.headers.get("Content-Length", "0"))
@@ -258,6 +258,17 @@ def main():
             except HTTPError as error:
                 self.reply(error.code, error.read(), dict(error.headers))
             except DeviceError as error:
+                if path.startswith('/api/sound/'):
+                    try:
+                        fields=json.loads(body)
+                        print('Sound request rejected:',path,'status',error.status,'offset',fields.get('offset'),
+                              'frames',fields.get('frames'),'pcm_chars',len(fields.get('pcm','')),'error',str(error),flush=True)
+                        if path=='/api/sound/chunk':
+                            import base64,zlib
+                            block=base64.b64decode(fields['pcm'],validate=True)
+                            print('Sound integrity:',len(block),'bytes; CRC matches',zlib.crc32(block)==fields.get('crc32'),
+                                  'expected_crc',fields.get('crc32'),flush=True)
+                    except (ValueError,UnboundLocalError,TypeError,KeyError,AttributeError):pass
                 self.reply(error.status, json.dumps({"error": str(error)}).encode(), {"Content-Type": "application/json"})
             except (OSError, ValueError, RuntimeError, KeyError) as error:
                 status = 409 if isinstance(error, ValueError) else 503

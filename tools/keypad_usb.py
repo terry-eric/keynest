@@ -91,12 +91,14 @@ class UsbDevice:
             try:
                 if self.serial.write(request) != len(request):
                     raise OSError("Incomplete USB request")
-                deadline = time.monotonic() + self.timeout
+                deadline = time.monotonic() + (30 if path == "/api/sound/commit" else 5 if path.startswith("/api/sound/") else self.timeout)
                 while time.monotonic() < deadline:
                     while b"\n" in self.pending:
                         line, _, remaining = self.pending.partition(b"\n")
                         self.pending[:] = remaining
                         if not line.startswith(b"PCB2_RPC "):
+                            if b'key_sound:' in line:
+                                print(line.decode('utf-8',errors='replace'),flush=True)
                             continue  # ESP-IDF diagnostic logs share this port.
                         try:
                             response = json.loads(line[9:])
@@ -119,8 +121,9 @@ class UsbDevice:
                     if len(self.pending) > 8192:
                         raise DeviceError(502, "USB response too large")
                 raise DeviceError(503, "USB 未回應；請確認 PCB 已更新為支援 USB 控制的韌體。")
-            except (OSError, DeviceError):
-                self.close()
+            except (OSError, DeviceError) as error:
+                if isinstance(error,OSError) or error.status==502 or (error.status==503 and str(error).startswith('USB ')):
+                    self.close()
                 raise
 
     @staticmethod
@@ -146,6 +149,10 @@ class UsbDevice:
         return self.rpc(path, body)
 
     def request(self, path, body=None, headers=None):
+        if path.startswith("/api/sd/recording.wav?"):
+            from urllib.parse import urlsplit, parse_qs
+            selected=parse_qs(urlsplit(path).query).get("name",[""])[0]
+            return self.download(selected)
         if path == "/api/recording.wav":
             return self.download()
         if path in ("/api/audio", "/api/microphone"):
@@ -170,15 +177,33 @@ class UsbDevice:
                 raise DeviceError(400, "Invalid JSON body") from error
             if not isinstance(arguments, dict):
                 raise DeviceError(400, "Use a JSON object")
-        data = self.rpc(path, arguments)
+        if path=='/api/sound/chunk':
+            try:
+                block=base64.b64decode(arguments['pcm'],validate=True)
+                crc=arguments['crc32']
+                if not block or len(block)>1024 or len(block)%2 or type(crc) is not int or zlib.crc32(block)!=crc:
+                    raise ValueError('Invalid sound block CRC/length')
+            except (KeyError,TypeError,ValueError) as error:
+                raise DeviceError(400,'Invalid sound block CRC/length') from error
+        for attempt in range(5):
+            try:
+                data = self.rpc(path, arguments)
+                break
+            except (OSError, DeviceError) as error:
+                transient = isinstance(error,OSError) or (error.status==503 and str(error).startswith("USB 未回應")) or (path=='/api/sound/chunk' and str(error)=='ESP_ERR_INVALID_CRC')
+                if path not in ("/api/sound/begin","/api/sound/chunk","/api/sound/commit") or not transient or attempt==4:
+                    raise
+                time.sleep(.1)
         return json.dumps(data).encode(), {"Content-Type": "application/json"}
 
-    def download(self):
+    def download(self, selected=None):
+        if selected is not None and (not isinstance(selected,str) or not re.fullmatch(r"(?:REC|KEY)[0-9]{5}\.WAV",selected)):
+            raise DeviceError(400,"Invalid SD audio filename")
         with self.lock:
-            info = self.rpc("/api/file/begin")
+            info = self.rpc("/api/file/begin", {"name":selected} if selected is not None else None)
             try:
                 filename = info.get("filename", "")
-                if not isinstance(filename, str) or not re.fullmatch(r"(?:INTERNAL|REC[0-9]{5})\.WAV", filename):
+                if not isinstance(filename, str) or not re.fullmatch(r"(?:INTERNAL|(?:REC|KEY)[0-9]{5})\.WAV", filename):
                     raise DeviceError(502, "Invalid recording filename")
                 wav = bytearray()
                 while True:
