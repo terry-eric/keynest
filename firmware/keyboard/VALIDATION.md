@@ -1,111 +1,22 @@
-# PCB2 Keypad 驗證紀錄
+# PCB2 Keypad v7 公開驗證摘要
 
-日期：2026-10-05。此紀錄區分實際交叉編譯、主機軟體測試、Web 展示模式與待實機驗證項目。
+此文件只包含版本、通用功能測試及尚未完成的項目，不包含原始音訊、裝置識別碼、USB 埠編號或本機工作路徑。
 
-## 2026-10-13：實機 USB 與 ZTS6672 診斷
+- ESP-IDF 5.5.0／PlatformIO 6.2.0 交叉編譯成功。app image 為 1,095,712 bytes，SHA-256 `74411911b25cf1cd9213693e63b43fcfc1b4e708c27ce7188e7f83520c1d7e2a`。三個燒錄映像均通過獨立 `verify_flash`。
+- 實機辨識 2,097,152 bytes Quad PSRAM。音效及 Flash 錄音緩衝優先使用 PSRAM，支援內部 RAM 回退；分段配置避免要求大型連續配置。
+- GUI 2 秒 WAV 音效上傳、最新錄音裁切成 1 秒音效、Flash 完整 CRC、四聲部播放計數通過；實體按鍵音效已聽測。Flash 2.048 秒錄音為 32,768 frames、65,580 bytes、0 dropped，重複下載一致。
+- 1200 baud USB touch 與網頁下載模式實測成功，下載埠與執行埠切換後可完成燒錄、校驗及正常重啟；音效與設定重啟後恢復。未聲稱所有 Arduino IDE 上傳流程皆已測試。
+- USB 原有 12 項測試、Web PCM／WAV 測試、新增裁切／重採樣／正規化／靜音及 NaN 拒絕、CRC32 測試，以及 USB 有限重送／不可重送操作測試通過。
+- 實機曾出現 USB PCM 區塊 CRC 錯誤；主機只重送冪等且相同的 sound begin／chunk／commit，最多 5 次，完整 CRC 仍須通過。根因尚未確認。
+- SD 曾成功讀到 7,948,206,080 bytes，錄音及兩次下載一致；其後仍出現 32,096,256 bytes／FATFS 掛載失敗或 CID CRC 錯誤。降到 400 kHz 尚未修復，未格式化或修改分割表。SD 音效保存尚未完成實機驗證。
+- 麥克風人聲收音品質仍未通過。原始錄音、Flash 備份及裝置識別碼不包含在此次發布。
 
-- USB 控制版本已在 ESP32-S3 上實際燒錄並獨立 `verify_flash` 成功；只寫 factory app 的 `0x10000`，完整 4 MB 原 Flash 已備份到本機。設定區與錄音區在燒錄前後逐 byte 相同。USB HID + CDC 枚舉成功，音量、PCM 波形、增益調整及 NVS 保存有實際回應；電腦保持原 Wi-Fi。
-- USB 原生監測與瀏覽器 RAM 錄音可同時執行；約 26 秒 WAV 為 16 kHz mono PCM16、415,616 frames，dropped frames 為 0。音訊只保存在本機，不上傳 GitHub。
-- 左 slot、gain 8 的 50 個視窗均不同；AC RMS 中位數 −65.90 dBFS、最高 −36.48 dBFS、age ≤2 ms，沒有削波。聲源沒有校準，這些數字**不代表人聲收音通過**。使用者回報下載 WAV 只有吹氣明顯。
-- 使用者確認實際 U10 是 **ZTS6672**。ZillTek DS-13 第 6 頁表格的 CONFIG-open／SELECT-low 對應 right；實際右聲道專用建置燒錄後，40 個 16 kHz PCM 視窗全部為 0，age ≤2 ms。不能把 datasheet 表格推定當成實機成功。
-- 診斷版增加可暫時切換 left／right 的 HTTP／USB 命令和網頁控制、雙 slot 增益前原始統計；重啟預設 left，避免留在已測得全零的 right。錄音中不允許聲道切換。資料對齊仍使用 Philips、32-bit stereo slots、24-bit signed PCM；啟動等待改為 50 ms。
-- 診斷版已燒錄到 `0x10000`，獨立 `verify_flash` 成功，app SHA-256 為 `dddb7bafbaa0bfb4e47fa625e7cbc07043a01c68135b165b75801b012e15d3cc`；設定區與錄音區仍逐 byte 相同。USB HID／CDC 與音訊初始化成功，開機 left、gain 8。
-- 從網頁切換 right／left 後，API 確認實際裝置的 slot 跟著改變。本機 USB 預覽漏掉的 channel POST 轉送已補上。各 20 個 PCM 視窗確認 right 全零、left 全部不同、age ≤2 ms，最後恢復 left。無效 slot、缺少 slot、未知欄位、重複欄位皆回覆 400；缺少控制 header 回覆 403。USB 主機解析會在轉送前拒絕重複欄位，避免 JSON 解碼將無效命令改成有效命令。
-- 使用者確認開始後取得 20.032 秒本機 WAV：16 kHz mono PCM16、320,512 frames，與裝置計數一致，dropped frames 0、削波 0。測試前 5 秒安靜，約第 10 秒提示連續說話；安靜部分的 250 ms AC RMS 中位數 −66.77 dBFS，後 15 秒中位數 −66.98 dBFS，沒有明顯人聲反應。錄音期間嘗試切換聲道回覆 409。**人聲收音品質仍未通過；USB 傳輸正常不能代替聲學驗證。** WAV 與逐視窗資料只保存在本機。
-- 主機 slot 選擇測試包含不同正負值、連續 frame、PCM24 endpoints 與低 8 位雜訊。Web PCM／WAV 測試、語法與交叉編譯通過；USB transport 12 個測試與相容預覽 5 個測試通過。診斷版 app 1,063,521 bytes、image 1,063,920 bytes，靜態 RAM 67,004 bytes。
-- CONFIG／SELECT 的實際焊接、PCB 實際貫穿收音孔、焊錫或外殼遮擋仍未驗證。2026-10-12 保存的 U10 footprint 有 Multi-Layer 圓形 FILL，沒有獨立 HOLE record；這不足以證明製造鑽孔存在。沒有即時 PCB MCP 連線，因此沒有修改 PCB 或宣稱最新實板與快照一致。
 
-## 2026-10-13：USB 控制與波形傳輸
+主機測試：
 
-- ESP-IDF 5.5.0 交叉編譯成功，無 compiler warning／error；USB CDC RX 2048 bytes、TX 8192 bytes 已核對生成的 `sdkconfig.h`。靜態 RAM 66,932 bytes；新 app 1,061,153 bytes，image 1,061,680 bytes。esptool 確認 checksum 與 image hash 有效。
-- 新增 USB CDC JSON RPC，與 HTTP 共用設定驗證與狀態；支援設定、按鍵效果、即時 PCM、三種錄音目的地及裝置 WAV 下載。PCM 附 Base64、長度與 CRC32。
-- `python tools/test-keypad-usb.py` 的 11 個測試通過：任意切包與混合日誌、忽略舊回應、開埠不要求 reset、設定只傳一次、帶正負 PCM 的 CRC、異常音訊與 metadata 拒絕、錄音 owner、HTTP status、協定版本、裝置選擇，以及下載完成／錯誤清理。
-- 既有本機相容預覽 5 個測試及 Web PCM／WAV 測試通過。USB 網頁顯示 USB 連線提示，USB 模式拒絕 Wi-Fi 切換參數；程式不呼叫 Wi-Fi 管理命令。
-- 實際 USB 埠已確認；舊韌體不回應 RPC，也無法經 esptool 自動進入下載模式。該 USB 版本後續已燒錄並驗證，見上方實機紀錄；收音品質仍未通過。
-
-新增測試：`python tools/test-keypad-usb.py`。
-
-## 2026-10-13：即時波形與麥克風測試
-
-- 即時波形韌體成功交叉編譯，新增 `mic_monitor.c` 與 `GET /api/microphone`。靜態 RAM 57,692 bytes；最終 app 使用量見新建置紀錄及 manifest。**本次未燒錄該版本**。
-- Production PCM 視窗經主機測試：正負樣本順序、超過 1024 樣本時保留最新資料、短讀、零容量、時間戳記與多個讀者不消耗樣本均通過。主機模擬不驗證 ESP32 上的 critical section 時間或跨核心競爭。
-- JavaScript 測試通過：DC-only 不產生假 AC 音量、正負 PCM、已知 AC RMS、削波、錯誤取樣率／長度／計數／過期資料拒絕，並保留既有 WAV 測試。
-- 本機相容預覽測試通過：新版直接唯讀、舊版讀取與 owner 清理、拒絕搶占進行中的錄音、遺失樣本時停止，以及不停止其他 owner 的錄音。
-- Web 展示模式檢查波形、去除偏移後音量、倍率、停止／重啟；390 × 844 手機畫面沒有水平溢出。展示使用合成音訊，不能證明真實收音。
-- 在實際 PCB 的既有韌體上，20 秒 USB telemetry 約 47,999 樣本／秒，讀取錯誤與逾時增量均為 0。說話／拍手測試的原始 meter 僅落在 −36.10 至 −36.04 dBFS。
-- 另以「瀏覽器」目的地接收 161,834 個 PCM 樣本，產生 10.114625 秒 mono／16 kHz／PCM16 WAV，dropped frames 為 0；未寫 SD 或裝置 Flash。原本 Wi-Fi 已在該錄音測試後恢復。
-- WAV 原始 RMS 約 −37.18 dBFS，平均偏移 +453.55 PCM；扣除平均值的 AC RMS 約 −72.95 dBFS。**取樣／傳輸成功，收音品質尚未通過；軟體解碼或硬體原因尚未定位。** 錄音與原始測試資料僅留在本機 `.tools/`，沒有加入 GitHub。
-
-新增測試：
-
-```sh
+```powershell
+python tools/test-keypad-usb.py
+python tools/test-custom-sound-usb-retries.py
 node tools/test-keypad-web.cjs
-python tools/test-keypad-preview.py
-gcc -std=c11 -Wall -Wextra -Itools/monitor-test-includes tools/test-mic-monitor.c firmware/keyboard/main/mic_monitor.c -o mic-monitor-test
-./mic-monitor-test
+node tools/test-custom-sound-web.cjs
 ```
-
-手機畫面：[即時波形展示](validation/mic-realtime-mobile.png)。以下保留 2026-10-05 原始版本驗證紀錄；其「尚未實機測試」敘述指該次工作。
-
-## 建置通過
-
-- 執行 `tools/build.ps1 -Keyboard`，以 PlatformIO 6.2.0／espressif32 6.12.0 呼叫 ESP-IDF 5.5.0、Xtensa GCC 14.2.0，結果 SUCCESS。
-- 主程式、board component、TinyUSB HID + CDC、Wi-Fi／HTTP、錄音 backend 與三個內嵌網頁資源均成功編譯、連結。
-- 最後建置紀錄沒有 compiler warning、error 或 undefined reference。
-- 靜態 RAM：55,620 / 327,680 bytes；app 使用量：1,048,069 / 2,097,152 bytes。動態 Wi-Fi、task、錄音配置另計，不能將上述 RAM 數值當作最壞使用量。
-- `firmware.bin` 實際大小 1,048,480 bytes。官方 esptool 4.9.0 確認 ESP32-S3（chip ID 9）、4 MB Flash、DIO、80 MHz，checksum 與 validation hash 均有效。
-- 產物在 `../artifacts/keyboard/`，對應 SHA-256 與燒錄位址在 `manifest.json`。
-- 最後來源與暫存建置目錄的 C／H、配置與 Web 資源內容核對一致，內嵌資源亦核對出現在 app image。
-
-## 主機測試通過
-
-| 測試 | 實際涵蓋 |
-|---|---|
-| `tools/test-keypad-logic.c` | 16 種四鍵按住組合、重複 usage 合併、修飾鍵、release、modifier-only、設定範圍案例、麥克風正負飽和、WAV header、標準 CRC32 fixture、音效靜音／幅度／起止、LED 關閉／常亮／漣漪 |
-| `tools/test-keypad-flash.c` | 直接編譯 production `flash_store.c`；模擬 NOR erase／write 規則、雙 slot、新開機掃描、部分 erase／header／PCM／metadata 失敗，以及 CRC 損壞後回復先前錄音 |
-| `tools/test-keypad-web.cjs` | WAV 格式／大小、時間範圍與非法 frame count；奇數 byte 或過大 PCM chunk 的拒絕 |
-| JavaScript 語法 | `node --check firmware/keyboard/main/web/app.js` 通過 |
-
-C 測試在 Windows 使用本機 TinyCC，連接 UCRT 的實際數學函式執行；測試回報 PASS。Flash 為主機模擬，沒有測量實體 Flash 延遲或磨耗。
-
-在具備 GCC 的環境，可從專案根目錄重跑同一組 production 邏輯與 Flash 模擬測試：
-
-```sh
-gcc -std=c11 -Wall -Wextra tools/test-keypad-logic.c firmware/keyboard/main/app_logic.c -lm -o keypad-logic-test
-./keypad-logic-test
-gcc -std=c11 -Wall -Wextra -Itools/flash-test-includes tools/test-keypad-flash.c firmware/keyboard/main/flash_store.c firmware/keyboard/main/app_logic.c -lm -o keypad-flash-test
-./keypad-flash-test
-node --check firmware/keyboard/main/web/app.js
-node tools/test-keypad-web.cjs
-```
-
-## Web App 展示模式通過
-
-使用本機靜態伺服器與明確的 `?demo=1` 模式，沒有連到 MCU：
-
-- 設定 KEY1 為 Ctrl+A，選彩虹 LED，套用後預覽及「尚未保存」狀態正確。
-- 保存操作後狀態顯示已保存；這是展示資料的保存流程，沒有寫入真實 NVS。
-- 切換內建 Flash，約 2.048 秒自動停止，顯示 `INTERNAL.WAV` 可下載。
-- 瀏覽器錄音到 60 秒自動停止。實際下載的 WAV 由 Python `wave` 開啟，確認 mono、16 kHz、16-bit、960,000 frames、60.0 秒、1,920,044 bytes；聲音是展示模式合成的 220 Hz，不是 PCB 麥克風。
-- 另一次瀏覽器錄音手動停止於約 18.2 秒，完成後下載連結生效、沒有錄音錯誤。
-- microSD 未掛載時該選項不可選，瀏覽器與 Flash 仍可選。
-- 沒有 `demo=1` 且實際 API 不存在時，呈現離線狀態、未知 USB／收音值，套用與錄音按鈕停用。
-- 檢查 390 × 844 手機及 1280 × 900 桌面 viewport，六個面板均可用，沒有水平溢出。
-- 展示模式操作期間沒有 JavaScript error／warning。
-
-畫面證據：[桌面版](validation/web-desktop.png)、[手機版](validation/web-mobile.png)。展示模式不驗證實體 Wi-Fi 傳輸、韌體 HTTP handler 或麥克風資料。
-
-## 待實機驗證
-
-本次沒有燒錄板子。接腳依 2026-09-19 EasyEDA 保存快照，沒有即時橋接驗證最新 PCB。使用者已回報 SD 卡座方向阻礙插卡，因此本版開機不依賴 SD 掛載。
-
-燒錄後請依序確認：
-
-1. USB HID + CDC 枚舉、F13–F16／自訂映射、四鍵組合與按放 release。
-2. 四顆 RGB 的實際對應位置、六種效果；NS4168 喇叭四種音效及音量。
-3. 實際 ZTS6672 的 SELECT／CONFIG、收音 slot／資料對齊、人聲音量與削波。
-4. Wi-Fi AP、手機控制、實際麥克風串流至瀏覽器 WAV；弱網路下的溢出提示。
-5. Flash 短錄音、重開機後下載、保存期間的即時性；真實斷電恢復。
-6. 若卡座可使用，再測試 SD 掛載、錄音、停止、下載及空間不足行為。
-
-主機測試與成功建置不代表以上電氣、傳輸與即時性項目已通過。
