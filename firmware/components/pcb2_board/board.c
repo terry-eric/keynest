@@ -2,7 +2,8 @@
 #include "board_logic.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
-#include "led_strip.h"
+#include "driver/rmt_tx.h"
+#include "driver/rmt_encoder.h"
 #include <string.h>
 
 static const gpio_num_t key_pins[PCB2_KEY_COUNT] = {
@@ -11,7 +12,15 @@ static const gpio_num_t key_pins[PCB2_KEY_COUNT] = {
 static pcb2_debounce_t keys[PCB2_KEY_COUNT];
 static uint8_t colors[PCB2_LED_COUNT][3];
 static uint8_t brightness = 32;
-static led_strip_handle_t strip;
+static rmt_channel_handle_t strip;
+static rmt_encoder_handle_t encoder;
+static bool strip_enabled;
+static rmt_symbol_word_t symbols[PCB2_LED_COUNT * 24 + 1];
+
+// Worldsemi WS2812B-2020-V6 V1.4, page 4. 20MHz = 50ns per tick.
+// T0H/T0L=300/950ns, T1H/T1L=650/600ns, bit=1250ns, reset=350us.
+enum { ZERO_HIGH = 6, ZERO_LOW = 19, ONE_HIGH = 13, ONE_LOW = 12, RESET_HALF = 3500 };
+_Static_assert(ZERO_HIGH + ZERO_LOW == 25 && ONE_HIGH + ONE_LOW == 25, "800kHz bit period");
 
 esp_err_t pcb2_board_init(void) {
     if (strip) return ESP_ERR_INVALID_STATE;
@@ -30,26 +39,31 @@ esp_err_t pcb2_board_init(void) {
         bool down = gpio_get_level(key_pins[i]) == 0;
         keys[i] = (pcb2_debounce_t){down, down, now};
     }
-    led_strip_config_t config = {
-        .strip_gpio_num = PCB2_PIN_RGB,
-        .max_leds = PCB2_LED_COUNT,
-        .led_model = LED_MODEL_WS2812,
-        .color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB
-    };
-    led_strip_rmt_config_t rmt = {
+    rmt_copy_encoder_config_t enc_config = {};
+    err = rmt_new_copy_encoder(&enc_config, &encoder);
+    rmt_tx_channel_config_t rmt = {
+        .gpio_num = PCB2_PIN_RGB,
         .clk_src = RMT_CLK_SRC_DEFAULT,
-        .resolution_hz = 10000000,
-        .mem_block_symbols = 64,
-        .flags.with_dma = false
+        .resolution_hz = 20000000,
+        .mem_block_symbols = 256,
+        .trans_queue_depth = 1,
+        .flags.with_dma = true
     };
-    err = led_strip_new_rmt_device(&config, &rmt, &strip);
+    if (err == ESP_OK) err = rmt_new_tx_channel(&rmt, &strip);
+    if (err == ESP_OK) {
+        err = rmt_enable(strip);
+        strip_enabled = err == ESP_OK;
+    }
     if (err == ESP_OK) {
         memset(colors, 0, sizeof(colors));
         brightness = 32;
-        err = led_strip_clear(strip);
+        err = pcb2_led_show();
     }
     if (err != ESP_OK) {
-        if (strip) { led_strip_del(strip); strip = NULL; }
+        if (strip_enabled) { rmt_disable(strip); strip_enabled = false; }
+        if (strip) { rmt_del_channel(strip); strip = NULL; }
+        if (encoder) { rmt_del_encoder(encoder); encoder = NULL; }
+        gpio_reset_pin(PCB2_PIN_RGB);
         for (size_t i = 0; i < PCB2_KEY_COUNT; ++i) gpio_reset_pin(key_pins[i]);
     }
     return err;
@@ -57,12 +71,20 @@ esp_err_t pcb2_board_init(void) {
 
 esp_err_t pcb2_board_deinit(void) {
     if (!strip) return ESP_ERR_INVALID_STATE;
-    esp_err_t err = led_strip_clear(strip);
-    esp_err_t deleted = led_strip_del(strip);
+    memset(colors, 0, sizeof(colors));
+    esp_err_t err = pcb2_led_show();
+    esp_err_t deleted = rmt_disable(strip);
+    if (deleted == ESP_OK) {
+        strip_enabled = false;
+        deleted = rmt_del_channel(strip);
+    }
     if (deleted != ESP_OK) return deleted;
     strip = NULL;
+    deleted = rmt_del_encoder(encoder);
+    encoder = NULL;
+    gpio_reset_pin(PCB2_PIN_RGB);
     for (size_t i = 0; i < PCB2_KEY_COUNT; ++i) gpio_reset_pin(key_pins[i]);
-    return err;
+    return deleted != ESP_OK ? deleted : err;
 }
 
 pcb2_keys_t pcb2_keys_poll(void) {
@@ -98,13 +120,29 @@ esp_err_t pcb2_led_brightness(uint8_t value) {
 }
 
 esp_err_t pcb2_led_show(void) {
-    if (!strip) return ESP_ERR_INVALID_STATE;
+    if (!strip || !encoder || !strip_enabled) return ESP_ERR_INVALID_STATE;
+    size_t position = 0;
     for (size_t i = 0; i < PCB2_LED_COUNT; ++i) {
-        esp_err_t err = led_strip_set_pixel(strip, i,
-            pcb2_scale_color(colors[i][0], brightness),
+        const uint8_t grb[] = {
             pcb2_scale_color(colors[i][1], brightness),
-            pcb2_scale_color(colors[i][2], brightness));
-        if (err != ESP_OK) return err;
+            pcb2_scale_color(colors[i][0], brightness),
+            pcb2_scale_color(colors[i][2], brightness)
+        };
+        for (size_t component = 0; component < 3; ++component) {
+            for (int bit = 7; bit >= 0; --bit) {
+                bool one = grb[component] & (1U << bit);
+                symbols[position++] = (rmt_symbol_word_t){
+                    .level0 = 1, .duration0 = one ? ONE_HIGH : ZERO_HIGH,
+                    .level1 = 0, .duration1 = one ? ONE_LOW : ZERO_LOW
+                };
+            }
+        }
     }
-    return led_strip_refresh(strip);
+    symbols[position] = (rmt_symbol_word_t){
+        .level0 = 0, .duration0 = RESET_HALF, .level1 = 0, .duration1 = RESET_HALF
+    };
+    rmt_transmit_config_t config = {0};
+    esp_err_t err = rmt_transmit(strip, encoder, symbols, sizeof(symbols), &config);
+    if (err == ESP_OK) err = rmt_tx_wait_all_done(strip, 1000);
+    return err;
 }

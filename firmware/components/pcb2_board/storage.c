@@ -3,6 +3,9 @@
 #include "driver/spi_common.h"
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
+#include "esp_log.h"
+
+void pcb2_sd_read_layout(const sdspi_device_config_t *device, uint32_t max_khz);
 
 static sdmmc_card_t *card;
 static bool bus_owned;
@@ -22,7 +25,7 @@ esp_err_t pcb2_sd_mount(void) {
     bus_owned = true;
     sdmmc_host_t host = SDSPI_HOST_DEFAULT();
     host.slot = SPI2_HOST;
-    host.max_freq_khz = 10000;
+    host.max_freq_khz = 400; // Diagnostic: retain the low initialization clock for all reads.
     sdspi_device_config_t device = SDSPI_DEVICE_CONFIG_DEFAULT();
     device.gpio_cs = PCB2_PIN_SD_CS;
     device.host_id = SPI2_HOST;
@@ -31,9 +34,16 @@ esp_err_t pcb2_sd_mount(void) {
         .max_files = 5,
         .allocation_unit_size = 16 * 1024
     };
+    ESP_LOGI("pcb2_sd", "Mount SPI max=%dkHz CS=%d MOSI=%d MISO=%d SCK=%d", host.max_freq_khz, PCB2_PIN_SD_CS, PCB2_PIN_SD_MOSI, PCB2_PIN_SD_MISO, PCB2_PIN_SD_SCK);
     err = esp_vfs_fat_sdspi_mount("/sdcard", &host, &device, &mount, &card);
+    if (err == ESP_OK) {
+        ESP_LOGI("pcb2_sd", "Mounted real_freq=%dkHz capacity=%llu bytes", card->real_freq_khz, (unsigned long long)card->csd.capacity * card->csd.sector_size);
+    } else {
+        ESP_LOGE("pcb2_sd", "Mount failed: %s (0x%x)", esp_err_to_name(err), (unsigned)err);
+    }
     if (err != ESP_OK) {
         card = NULL;
+        pcb2_sd_read_layout(&device, host.max_freq_khz);
         if (spi_bus_free(SPI2_HOST) == ESP_OK) bus_owned = false;
     }
     return err;
