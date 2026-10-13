@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#10121a"><title>PCB2 · 四鍵控制台</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
 <body>
-<header class="topbar"><a class="brand" href="/"><span class="brandmark">P2</span><span>PCB2<span class="brand-sub">KEYPAD STUDIO</span></span></a><span class="connection" id="connection" role="status"><i></i>連線中</span><button class="quiet" id="reconnect">重新連線</button><button class="quiet" id="preview-close" hidden>結束預覽</button></header>
+<header class="topbar"><a class="brand" href="/"><span class="brandmark">P2</span><span>PCB2<span class="brand-sub">KEYPAD STUDIO</span></span></a><span class="connection" id="connection" role="status"><i></i>連線中</span><button class="quiet" id="usb-update" hidden>USB 更新模式</button><button class="quiet" id="reconnect">重新連線</button><button class="quiet" id="preview-close" hidden>結束預覽</button></header>
 <main>
   <div class="heading"><div><p class="eyebrow">YOUR FOUR KEYS, YOUR WAY</p><h1>四鍵控制台<span class="dot">.</span></h1><p class="subtitle">按鍵、燈光與聲音，都在這裡設定。</p></div><div class="heading-actions"><span id="save-state">尚未讀取裝置</span><button class="button primary" id="save">保存到裝置 <span>↗</span></button></div></div>
   <div class="offline" id="offline" hidden><strong>尚未連上鍵盤</strong><span>USB 模式請確認資料線已連接且本機工具正在執行；Wi-Fi 模式請連上 PCB2-Keypad-XXXX 後開啟 http://192.168.4.1。連線恢復時會自動更新。</span></div>
@@ -35,15 +35,26 @@
       <label class="range-label" for="speed">動畫速度 <output id="speed-value">80%</output></label><input id="speed" type="range" min="20" max="200" value="80">
     </section>
     <section class="panel"><div class="panel-head"><div><span class="section-number">04</span><h2>按鍵音效</h2></div><span class="mini-label">NS4168</span></div>
-      <label class="field-label" for="sound">音效風格</label><select id="sound"><option value="0">靜音</option><option value="1">輕點 · Click</option><option value="2" selected>和弦 · Chime</option><option value="3">復古 · Retro</option><option value="4">泡泡 · Bubble</option></select>
+      <label class="field-label" for="sound">音效風格</label><select id="sound"><option value="0">靜音</option><option value="1">輕點 · Click</option><option value="2" selected>和弦 · Chime</option><option value="3">復古 · Retro</option><option value="4">泡泡 · Bubble</option><option value="5">自訂錄音／上傳音效</option></select>
       <label class="range-label" for="volume">喇叭音量 <output id="volume-value">10%</output></label><input id="volume" type="range" min="0" max="100" value="10">
       <div class="sound-note"><span class="sound-icon">♪</span><div><strong>每顆按鍵，都有自己的音高</strong><p>四種合成音效，帶淡入淡出。可同時混合四鍵聲音。</p></div></div><button id="test-sound" class="button secondary">♪ 測試音效</button>
+      <div class="custom-sound">
+        <h3>自己的按鍵聲</h3><p class="caption">四顆按鍵共用一段音效，最長 2 秒。保存後可直接在板上播放。</p>
+        <label class="field-label" for="sound-file">上傳聲音</label><input id="sound-file" type="file" accept="audio/*,.wav,.mp3,.ogg,.m4a,.flac">
+        <button class="button secondary" id="sound-recording">使用最新錄音</button>
+        <p class="caption" id="sound-source">請選音效檔，或使用板子／瀏覽器錄好的聲音。</p>
+        <div class="clip-fields"><label>片段起點（秒）<input id="clip-start" type="number" min="0" step="0.05" value="0"></label><label>片段長度（秒）<input id="clip-length" type="number" min="0.05" max="2" step="0.05" value="1"></label></div>
+        <label class="normalize"><input id="clip-normalize" type="checkbox">放大較小的錄音音量</label>
+        <label class="field-label" for="sound-storage">音效保存在哪裡？</label><select id="sound-storage"><option value="flash">內建儲存 · Flash</option><option value="sd">microSD</option></select>
+        <button class="button primary" id="sound-upload" disabled>保存並設為按鍵聲</button>
+        <p class="caption" id="sound-status" role="status">正在確認自訂音效功能。</p>
+      </div>
     </section>
     <section class="panel mapping-panel"><div class="panel-head"><div><span class="section-number">05</span><h2>USB 按鍵映射</h2></div><span class="mini-label">套用後生效</span></div><div class="mapping-header"><span>實體按鍵</span><span>輸出的按鍵</span><span>修飾鍵</span></div><div id="mappings"></div><div class="apply-row"><p class="caption">預設 F13–F16。可同時按住四鍵；放開時會送出 release。</p><button class="button secondary" id="apply">套用變更</button></div></section>
     <section class="panel recording-panel"><div class="panel-head"><div><span class="section-number">06</span><h2>錄音與保存</h2></div><span class="pill" id="rec-status">待命</span></div>
       <label class="field-label" for="record-target">這次要存在哪裡？</label><select id="record-target"><option value="browser">瀏覽器 · 保存到手機／電腦</option><option value="flash">內建 Flash · 裝置短錄音</option><option value="sd">microSD · 選用</option></select><p class="target-help" id="target-help">不用 SD 卡。請保持網頁開啟與 Wi-Fi 連線，完成後下載 WAV。</p>
       <div class="record-display"><span id="record-dot"></span><strong id="rec-duration">00:00.0</strong><span>16 kHz · mono · WAV</span></div><div class="record-actions"><button class="button record" id="record-start">● 開始錄音</button><button class="button secondary" id="record-stop" disabled>■ 停止</button></div>
-      <p class="record-error" id="record-error" role="status"></p><div class="record-files"><a class="download-link disabled" id="browser-download">↓ 下載本次瀏覽器錄音</a><button class="download-link" id="device-download" disabled>↓ 下載裝置保存的錄音</button></div><div class="storage-row"><span id="flash-status">Flash 尚未確認</span><span id="sd-status">SD 尚未確認</span><button class="quiet" id="sd-retry">重新偵測 SD</button></div>
+      <p class="record-error" id="record-error" role="status"></p><div class="record-files"><a class="download-link disabled" id="browser-download">↓ 下載本次瀏覽器錄音</a><button class="download-link" id="device-download" disabled>↓ 下載裝置保存的錄音</button></div><div class="sd-audio-files"><button class="quiet" id="sd-files-refresh">查看 SD 錄音與音效</button><label class="field-label" for="sd-file">SD 音訊檔案</label><select id="sd-file"><option value="">先載入 SD 清單</option></select><div class="record-actions"><button class="button secondary" id="sd-file-download" disabled>下載到電腦</button><button class="button secondary" id="sd-file-sound" disabled>選為按鍵聲片段</button></div><p class="caption" id="sd-files-note">可查看板子保存的 REC／KEY WAV；其他檔案請用讀卡機。</p></div><div class="storage-row"><span id="flash-status">Flash 尚未確認</span><span id="sd-status">SD 尚未確認</span><button class="quiet" id="sd-retry">重新偵測 SD</button></div>
     </section>
   </div>
   <footer><span>PCB2 KEYPAD STUDIO <i>／</i> ESP-IDF</span><span id="device-address">192.168.4.1 · 裝置提供的離線控制頁面</span></footer>

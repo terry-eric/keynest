@@ -36,8 +36,37 @@ function validateMicrophonePacket(packet) {
       !Number.isFinite(packet.ageMs) || packet.ageMs < 0 || packet.ageMs > 1000) throw new Error("Invalid or stale microphone response");
   return packet;
 }
+function soundCRC32(bytes) {
+  let crc=0xffffffff;
+  for(const value of bytes){crc^=value;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}
+  return (crc^0xffffffff)>>>0;
+}
+function keySoundPCM(channels,rate,start,seconds,normalize=false) {
+  if(!Array.isArray(channels)||!channels.length||channels.length>8||!Number.isInteger(rate)||rate<8000||rate>192000||
+     !Number.isFinite(start)||start<0||!Number.isFinite(seconds)||seconds<=0||seconds>2)throw new Error("音效片段必須是 0～2 秒內的有效音訊。");
+  const available=channels[0].length;
+  if(!channels.every(c=>c instanceof Float32Array&&c.length===available))throw new Error("音訊聲道資料不完整。");
+  const frames=Math.min(32000,Math.floor(seconds*16000),Math.floor((available/rate-start)*16000));
+  if(frames<=0)throw new Error("片段起點超過錄音長度。");
+  const mono=new Float32Array(frames);let sum=0;
+  for(let i=0;i<frames;i++){
+    const at=(start+i/16000)*rate,lo=Math.floor(at),hi=Math.min(lo+1,available-1),fraction=at-lo;
+    let value=0;for(const channel of channels)value+=(channel[lo]*(1-fraction)+channel[hi]*fraction)/channels.length;
+    if(!Number.isFinite(value))throw new Error("音訊含有無效的數值。");
+    mono[i]=Math.max(-1,Math.min(1,value));sum+=mono[i];
+  }
+  const dc=sum/frames;let peak=0;for(const value of mono)peak=Math.max(peak,Math.abs(value-dc));
+  const gain=normalize&&peak>0?0.85/peak:1,bytes=new Uint8Array(frames*2),view=new DataView(bytes.buffer);
+  let audible=false;
+  for(let i=0;i<frames;i++){
+    const value=Math.round(Math.max(-1,Math.min(1,(mono[i]-dc)*gain))*32767);
+    audible||=value!==0;view.setInt16(i*2,value,true);
+  }
+  if(!audible)throw new Error("選取的片段沒有可播放的聲音；請重新錄音或選其他片段。");
+  return bytes;
+}
 if (typeof module === "object" && module.exports) {
-  module.exports = { wavHeader, validateAudioChunk, analyzePCM, validateMicrophonePacket };
+  module.exports = { wavHeader, validateAudioChunk, analyzePCM, validateMicrophonePacket, soundCRC32, keySoundPCM };
 } else {
   document.addEventListener("DOMContentLoaded", initialize);
 }
@@ -58,6 +87,7 @@ function initialize() {
   const defaults = {led_mode:4,brightness:64,speed:80,volume:10,mic_gain:2,sound:2,color:[120,88,255],keycodes:[104,105,106,107],modifiers:[0,0,0,0]};
   const simulation = {config:structuredClone(defaults),dirty:false,keys:0,audio_ready:true,mic_preview:true,mic_model:"ZTS6672",mic_slot:"left",usb_connected:true,ssid:"PCB2-Keypad-DEMO",ip:"展示模式",mic_dbfs:-32,mic_peak:.12,recording:{sd_ready:false,flash_ready:true,mounting:false,downloading:false,state:0,target:0,last_target:1,frames:0,duration_ms:0,dropped_frames:0,limit_seconds:60,flash_limit_seconds:2.048,filename:"",error:""}};
   let demoStarted=0, demoDelivered=0;
+  let selectedAudio=null,lastRecordingBlob=null;
   $("demo-banner").hidden = !demo;
   for (let i=0;i<4;i++) {
     const row = document.createElement("div"); row.className="mapping-row";
@@ -86,7 +116,7 @@ function initialize() {
   }
   async function request(path,body) {
     if (demo) return demoRequest(path,body);
-    const response=await fetch(path,{method:body===undefined?"GET":"POST",cache:"no-store",signal:AbortSignal.timeout(3000),headers:body===undefined?{}:{"Content-Type":"application/json","X-PCB2-Control":"1"},body:body===undefined?undefined:JSON.stringify(body)});
+    const response=await fetch(path,{method:body===undefined?"GET":"POST",cache:"no-store",signal:AbortSignal.timeout(path.startsWith("/api/sound/")||path.startsWith("/api/sd/")?30000:3000),headers:body===undefined?{}:{"Content-Type":"application/json","X-PCB2-Control":"1"},body:body===undefined?undefined:JSON.stringify(body)});
     let json; try {json=await response.json();} catch {throw new Error("裝置回應格式不正確");}
     if (!response.ok) throw new Error(json.error || "裝置拒絕操作"); return json;
   }
@@ -149,6 +179,15 @@ function initialize() {
     $("record-target").options[1].disabled=!!state&&!r?.flash_ready;$("record-target").options[2].disabled=!!state&&!r?.sd_ready;
     $("monitor-toggle").disabled=!monitoring&&(!connected||!state?.audio_ready||state?.mic_preview===false);
     $("mic-channel").disabled=!connected||busy||recording||!!capture||!state?.mic_slot;
+    $("usb-update").disabled=!connected||busy||downloading||recording||!!state?.custom_sound?.uploading;
+    const custom=!!state?.custom_sound?.supported,locked=!connected||busy||downloading||recording||!!capture||!!state?.custom_sound?.uploading;
+    $("sound-upload").disabled=locked||!custom||!selectedAudio||($("sound-storage").value==="sd"&&!r?.sd_ready);
+    $("sound-recording").disabled=locked||!custom||(!lastRecordingBlob&&!r?.filename);
+    $("sound-file").disabled=locked||!custom;$("sound-storage").disabled=locked||!custom;
+    $("sound-storage").options[1].disabled=!r?.sd_ready;
+    $("sound").options[5].disabled=!custom||!state?.custom_sound?.ready;
+    $("sd-files-refresh").disabled=locked||!custom||!r?.sd_ready;
+    ["sd-file-download","sd-file-sound"].forEach(id=>$(id).disabled=locked||!custom||!r?.sd_ready||!$("sd-file").value);
     if(monitoring&&state?.mic_preview_legacy)["record-start","sd-retry","save"].forEach(id=>$(id).disabled=true);
   }
   function targetHelp() {
@@ -159,6 +198,7 @@ function initialize() {
   function render(next) {
     state=next;
     $("preview-close").hidden=!next.local_preview;
+    $("usb-update").hidden=!next.usb_auto_download;
     if (!draft || !edited && JSON.stringify(draft)!==JSON.stringify(next.config)) loadConfig(next.config);
     if(!edited)$("save-state").textContent=next.dirty?"已套用・尚未保存":"設定已保存";
     $("usb-status").textContent=next.usb_connected?"USB HID 已連接":"USB 尚未連接";$("usb-status").classList.toggle("active",next.usb_connected);
@@ -167,6 +207,8 @@ function initialize() {
     if (!monitoring) showLevel(next.audio_ready?next.mic_dbfs:null, false);
     history.push(next.audio_ready?(monitoring?(micStats?.acPeak||0):next.mic_peak):0);history.shift();drawHistory();
     document.querySelectorAll("[data-trigger]").forEach(button=>button.classList.toggle("down",!!(next.keys&(1<<Number(button.dataset.trigger)))));
+    const custom=next.custom_sound;
+    $("sound-status").textContent=!custom?.supported?"更新韌體後可保存自訂音效。":custom.error?custom.error:custom.uploading?"正在接收或保存音效…":custom.ready?("已保存到 "+(custom.storage==="sd"?"SD："+custom.filename:"內建儲存")+" · "+(custom.frames/16000).toFixed(2)+" 秒"):"尚未保存自訂音效。";
     const r=next.recording;$("rec-status").textContent=["待命","準備中","錄音中","完成與保存中","錄音已停止"][r.state]||"未知";$("rec-status").classList.toggle("active",r.state===2);
     $("record-dot").classList.toggle("live",r.state===2);const seconds=r.duration_ms/1000;$("rec-duration").textContent=String(Math.floor(seconds/60)).padStart(2,"0")+":"+(seconds%60).toFixed(1).padStart(4,"0");
     $("record-error").textContent=r.error || captureError || (r.dropped_frames?"資料遺失，請重新錄音。":"");
@@ -273,6 +315,7 @@ function initialize() {
           if(packet.state===4||session.frames!==packet.frames)throw new Error("錄音未完整接收，請重新錄音。");
           if(!session.frames)throw new Error("沒有收到收音資料。");
           const blob=new Blob([wavHeader(session.frames),...session.chunks],{type:"audio/wav"});
+          lastRecordingBlob=blob;
           if(downloadURL)URL.revokeObjectURL(downloadURL);downloadURL=URL.createObjectURL(blob);
           $("browser-download").href=downloadURL;$("browser-download").download="PCB2-"+Date.now()+".wav";$("browser-download").classList.remove("disabled");
           toast("錄音完成，可下載到手機或電腦。");break;
@@ -292,6 +335,81 @@ function initialize() {
   $("apply").addEventListener("click",()=>action(async()=>{await apply();toast("設定已套用，保存後會在重開機保留。");}));
   $("save").addEventListener("click",()=>action(async()=>{if(edited)await apply();await request("/api/save",{});toast("設定已保存到裝置。");}));
   $("test-sound").addEventListener("click",()=>action(()=>trigger(0)));$("reconnect").addEventListener("click",poll);
+  async function selectAudio(bytes,label) {
+    selectedAudio=null;$("sound-source").textContent="正在讀取音訊…";
+    if(bytes.byteLength>20*1024*1024)throw new Error("音訊檔請小於 20MB。");
+    const context=new AudioContext();
+    try {
+      const decoded=await context.decodeAudioData(bytes.slice(0));
+      selectedAudio={channels:Array.from({length:decoded.numberOfChannels},(_,i)=>decoded.getChannelData(i)),rate:decoded.sampleRate};
+      $("clip-start").value=0;$("clip-length").value=Math.min(1,decoded.duration).toFixed(2);
+      $("sound-source").textContent=label+" · "+decoded.duration.toFixed(2)+" 秒；請選取最多 2 秒。";
+    } finally {await context.close();}
+    controls();
+  }
+  async function wavBytes(path) {
+    const response=await fetch(path,{cache:"no-store",signal:AbortSignal.timeout(60000)});
+    if(!response.ok)throw new Error("無法讀取錄音；請先完成錄音並確認 SD 已掛載。");
+    return response.arrayBuffer();
+  }
+  $("sound-file").addEventListener("change",()=>action(async()=>{
+    const file=$("sound-file").files[0];if(!file)return;
+    if(file.size>20*1024*1024)throw new Error("音訊檔請小於 20MB。");
+    await selectAudio(await file.arrayBuffer(),file.name);
+  }));
+  $("sound-recording").addEventListener("click",()=>action(async()=>{
+    downloading=true;controls();
+    try {await selectAudio(lastRecordingBlob&&state.recording.target===0?await lastRecordingBlob.arrayBuffer():await wavBytes("/api/recording.wav"),"最新錄音");}
+    finally {downloading=false;}
+  }));
+  $("usb-update").addEventListener("click",()=>action(async()=>{
+    await request("/api/device/restart",{mode:"bootloader"});
+    toast("正在切換到 USB 更新模式，裝置會暫時離線。");
+  }));
+  $("sound-storage").addEventListener("change",controls);
+  $("sound-upload").addEventListener("click",()=>action(async()=>{
+    if(!selectedAudio)throw new Error("請先選聲音。");
+    const bytes=keySoundPCM(selectedAudio.channels,selectedAudio.rate,Number($("clip-start").value),Number($("clip-length").value),$("clip-normalize").checked);
+    const owner=ownerID(),storage=$("sound-storage").value;let began=false;
+    downloading=true;controls();
+    try {
+      await request("/api/sound/begin",{owner,storage,frames:bytes.length/2,crc32:soundCRC32(bytes)});began=true;
+      for(let offset=0;offset<bytes.length;offset+=1024){
+        const chunk=bytes.subarray(offset,offset+1024);
+        await request("/api/sound/chunk",{owner,offset,pcm:btoa(String.fromCharCode(...chunk)),crc32:soundCRC32(chunk)});
+        $("sound-status").textContent="傳送音效 "+Math.round((offset+chunk.length)/bytes.length*100)+"%";
+      }
+      $("sound-status").textContent="正在保存音效…";await request("/api/sound/commit",{owner});began=false;
+      $("sound").value=5;changed();await apply();await request("/api/save",{});
+      toast("音效已保存，現在按下實體按鍵就能播放。");
+    } finally {
+      if(began)try{await request("/api/sound/cancel",{owner});}catch{}
+      downloading=false;
+    }
+  }));
+  $("sd-files-refresh").addEventListener("click",()=>action(async()=>{
+    const result=await request("/api/sd/files");
+    if(!result.ok)throw new Error(result.error);
+    $("sd-file").replaceChildren(new Option("選擇 SD 錄音／音效",""));
+    for(const file of result.files)$("sd-file").add(new Option(file.name+" · "+Math.round(file.bytes/1024)+"KB",file.name));
+    $("sd-files-note").textContent=result.truncated?"已顯示前 32 個音訊檔；完整卡片內容請用讀卡機。":result.files.length?"可下載，或選取片段保存為按鍵聲。":"SD 上還沒有板子錄下或保存的 WAV。";
+  }));
+  $("sd-file").addEventListener("change",controls);
+  function sdPath(){return "/api/sd/recording.wav?name="+encodeURIComponent($("sd-file").value);}
+  $("sd-file-sound").addEventListener("click",()=>action(async()=>{
+    downloading=true;controls();
+    try{await selectAudio(await wavBytes(sdPath()),$("sd-file").value);}
+    finally{downloading=false;}
+    $("sound-source").scrollIntoView({behavior:"smooth",block:"center"});
+  }));
+  $("sd-file-download").addEventListener("click",()=>action(async()=>{
+    downloading=true;controls();
+    try{
+      const bytes=await wavBytes(sdPath()),url=URL.createObjectURL(new Blob([bytes],{type:"audio/wav"})),link=document.createElement("a");
+      link.href=url;link.download=$("sd-file").value;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+      toast("SD 錄音已讀取，請查看電腦下載項目。");
+    }finally{downloading=false;}
+  }));
   $("mic-channel").addEventListener("change",()=>action(async()=>{
     await request("/api/microphone/channel",{slot:$("mic-channel").value});
     micFrames=-1;clearMicrophone("聲道已切換，正在取得新資料…");await poll();
