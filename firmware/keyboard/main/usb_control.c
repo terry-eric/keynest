@@ -66,6 +66,8 @@ static void handle_line(char *line, size_t length) {
     cJSON *data = NULL; esp_err_t err = ESP_OK;
     if (!strcmp(path, "/api/state") && !body) {
         data = app_state_json();
+    } else if (!strcmp(path,"/api/sd/files") && !body) {
+        data=app_sd_files_json();
     } else if (!strcmp(path, "/api/microphone") && !body) {
         int16_t pcm[MIC_MONITOR_FRAMES]; mic_monitor_snapshot_t snapshot;
         mic_monitor_read(pcm, MIC_MONITOR_FRAMES, &snapshot);
@@ -84,8 +86,14 @@ static void handle_line(char *line, size_t length) {
             cJSON_AddNumberToObject(data, "state", status.state); cJSON_AddNumberToObject(data, "frames", status.frames);
             cJSON_AddNumberToObject(data, "dropped", status.dropped_frames);
         }
-    } else if (!strcmp(path, "/api/file/begin") && !body) {
-        char name[16]; err = file_active ? ESP_ERR_INVALID_STATE : recorder_download_begin(name);
+    } else if (!strcmp(path, "/api/file/begin")) {
+        char name[16];
+        if(file_active)err=ESP_ERR_INVALID_STATE;
+        else if(body) {
+            cJSON *selected=cJSON_GetObjectItemCaseSensitive(body,"name");
+            if(!cJSON_IsString(selected) || cJSON_GetArraySize(body)!=1 || strlen(selected->valuestring)>=sizeof(name))err=ESP_ERR_INVALID_ARG;
+            else {snprintf(name,sizeof(name),"%s",selected->valuestring);err=recorder_download_sd_begin(name);}
+        } else err=recorder_download_begin(name);
         if (err == ESP_OK) {
             file_active = true; file_offset = 0; file_touched = esp_timer_get_time();
             data = cJSON_CreateObject(); if (data) cJSON_AddStringToObject(data, "filename", name);

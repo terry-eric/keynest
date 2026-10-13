@@ -1,5 +1,6 @@
 #include "app.h"
 #include "app_api.h"
+#include "device_control.h"
 #include "tinyusb.h"
 #include "tusb_cdc_acm.h"
 #include "tusb_console.h"
@@ -43,6 +44,24 @@ void usb_keyboard_tick(uint8_t down, const keypad_config_t *config) {
         last_valid = true; last_sent = now;
     }
 }
+static uint32_t cdc_baud=115200;
+static unsigned reset_sequence;
+static int64_t reset_started;
+static void cdc_line_coding(int itf,cdcacm_event_t *event) {
+    (void)itf;cdc_baud=event->line_coding_changed_data.p_line_coding->bit_rate;
+}
+static void cdc_line_state(int itf,cdcacm_event_t *event) {
+    (void)itf;bool dtr=event->line_state_changed_data.dtr,rts=event->line_state_changed_data.rts;
+    if(cdc_baud==1200 && !dtr) {device_request_restart(true);reset_sequence=0;return;}
+    unsigned value=(dtr?2:0)|(rts?1:0);
+    static const unsigned sequence[]={1,3,2,0};
+    int64_t now=esp_timer_get_time();
+    if(reset_sequence && now-reset_started>2000000)reset_sequence=0;
+    if(value==sequence[reset_sequence]) {
+        if(!reset_sequence)reset_started=now;
+        if(++reset_sequence==4){reset_sequence=0;device_request_restart(true);}
+    } else {reset_sequence=value==1?1:0;if(value==1)reset_started=now;}
+}
 esp_err_t usb_keyboard_start(void) {
     uint8_t mac[6]; esp_err_t err = esp_read_mac(mac, ESP_MAC_WIFI_STA);
     if (err != ESP_OK) return err;
@@ -54,7 +73,7 @@ esp_err_t usb_keyboard_start(void) {
     };
     err = tinyusb_driver_install(&config);
     if (err != ESP_OK) return err;
-    tinyusb_config_cdcacm_t cdc = {.usb_dev = TINYUSB_USBDEV_0, .cdc_port = TINYUSB_CDC_ACM_0, .rx_unread_buf_sz = 2048};
+    tinyusb_config_cdcacm_t cdc = {.usb_dev = TINYUSB_USBDEV_0, .cdc_port = TINYUSB_CDC_ACM_0, .rx_unread_buf_sz = 2048, .callback_line_state_changed=cdc_line_state, .callback_line_coding_changed=cdc_line_coding};
     err = tusb_cdc_acm_init(&cdc);
     if (err == ESP_OK) err = esp_tusb_init_console(TINYUSB_CDC_ACM_0);
     if (err == ESP_OK) err = usb_control_start();

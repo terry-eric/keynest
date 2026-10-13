@@ -1,5 +1,6 @@
 #include "app.h"
 #include "recorder.h"
+#include "key_sound.h"
 #include "mic_monitor.h"
 #include "pcb2_board.h"
 #include "esp_log.h"
@@ -23,8 +24,11 @@ static void worker(void *unused) {
     unsigned decimation = 0; int32_t average = 0;
     for (;;) {
         sound_command_t command;
-        while (xQueueReceive(commands, &command, 0) == pdTRUE)
+        while (xQueueReceive(commands, &command, 0) == pdTRUE) {
             logic_voice_start(&voices[command.key % 4], command.key, command.effect);
+            if (command.effect == SOUND_CUSTOM) key_sound_trigger(command.key % 4);
+            else key_sound_stop(command.key % 4);
+        }
         keypad_config_t config; app_get_config(&config);
         size_t count = 0;
         esp_err_t err = pcb2_audio_read(mic, 128, &count, 100);
@@ -43,6 +47,7 @@ static void worker(void *unused) {
                 average = 0; decimation = 0;
             }
         }
+        key_sound_mix(speaker, count, config.volume);
         if (recording_count) {
             mic_monitor_feed(recording, recording_count);
             recorder_feed(recording, recording_count);

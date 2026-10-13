@@ -1,5 +1,6 @@
 #include "app.h"
 #include "recorder.h"
+#include "key_sound.h"
 #include "nvs_flash.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -13,8 +14,9 @@ void app_main(void) {
     ESP_ERROR_CHECK(usb_keyboard_start());
     esp_err_t audio = audio_worker_start();
     if (audio != ESP_OK) ESP_LOGE("keypad", "Audio unavailable: %s", esp_err_to_name(audio));
+    ESP_ERROR_CHECK(key_sound_init());
     ESP_ERROR_CHECK(web_server_start());
-    ESP_LOGI("keypad", "USB HID + CDC ready. Hardware pin map: 2026-09-19.");
+    ESP_LOGI("keypad", "USB HID + CDC ready. Custom key sound Flash/SD, max 2s; SD max 400kHz; RGB GPIO13 V6; source 651cd74.");
     if (xTaskCreatePinnedToCore(app_controller_run, "keypad-keys", 6144, NULL, 5, NULL, 1) != pdPASS)
         ESP_ERROR_CHECK(ESP_ERR_NO_MEM);
 }

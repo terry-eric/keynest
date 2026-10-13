@@ -52,7 +52,7 @@ uint32_t logic_crc32(uint32_t seed, const void *data, size_t length) {
     return ~crc;
 }
 void logic_voice_start(keypad_voice_t *v, unsigned key, unsigned effect) {
-    const unsigned lengths[] = {0, 3360, 12480, 7200, 8640};
+    const unsigned lengths[] = {0, 3360, 12480, 7200, 8640, 0};
     *v = (keypad_voice_t){.effect = effect < SOUND_COUNT ? effect : 0, .key = key % 4};
     v->length = lengths[v->effect];
 }

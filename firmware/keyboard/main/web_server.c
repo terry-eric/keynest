@@ -2,6 +2,9 @@
 #include "app_api.h"
 #include "recorder.h"
 #include "mic_monitor.h"
+#include "key_sound.h"
+#include "device_control.h"
+#include "mbedtls/base64.h"
 #include "pcb2_board.h"
 #include "esp_http_server.h"
 #include "esp_wifi.h"
@@ -9,6 +12,7 @@
 #include "esp_event.h"
 #include "esp_mac.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "cJSON.h"
 #include "sdkconfig.h"
@@ -64,6 +68,10 @@ cJSON *app_state_json(void) {
     cJSON_AddBoolToObject(json, "dirty", state.dirty); cJSON_AddBoolToObject(json, "audio_ready", state.audio_ready);
     cJSON_AddNumberToObject(json, "mic_dbfs", state.mic_dbfs); cJSON_AddNumberToObject(json, "mic_peak", state.mic_peak);
     cJSON_AddBoolToObject(json, "mic_preview", true);
+    cJSON_AddBoolToObject(json, "usb_auto_download", true);
+    cJSON_AddNumberToObject(json,"psram_bytes",heap_caps_get_total_size(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(json,"psram_free_bytes",heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+    cJSON_AddNumberToObject(json,"internal_free_bytes",heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
 #if CONFIG_PCB2_MIC_ZTS6672
     cJSON_AddStringToObject(json, "mic_model", "ZTS6672");
 #else
@@ -99,8 +107,40 @@ cJSON *app_state_json(void) {
         cJSON_AddNumberToObject(rec, "flash_limit_seconds", (double)FLASH_CAPTURE_FRAMES / CAPTURE_RATE);
         cJSON_AddStringToObject(rec, "filename", recording.filename); cJSON_AddStringToObject(rec, "error", recording.error);
     }
+    key_sound_status_t sample; key_sound_snapshot(&sample);
+    cJSON *custom = cJSON_AddObjectToObject(json, "custom_sound");
+    if (custom) {
+        cJSON_AddBoolToObject(custom,"supported",true); cJSON_AddBoolToObject(custom,"ready",sample.ready);
+        cJSON_AddBoolToObject(custom,"uploading",sample.uploading);
+        cJSON_AddStringToObject(custom,"storage",sample.storage==REC_SD?"sd":"flash");
+        cJSON_AddStringToObject(custom,"filename",sample.filename);
+        cJSON_AddNumberToObject(custom,"frames",sample.frames); cJSON_AddNumberToObject(custom,"crc32",sample.crc32);
+        cJSON_AddNumberToObject(custom,"max_seconds",2);
+        cJSON_AddStringToObject(custom,"error",sample.error);
+        cJSON *plays=cJSON_AddArrayToObject(custom,"plays"), *rendered=cJSON_AddArrayToObject(custom,"rendered");
+        for(unsigned i=0;i<4;++i) {
+            if(plays)cJSON_AddItemToArray(plays,cJSON_CreateNumber(sample.plays[i]));
+            if(rendered)cJSON_AddItemToArray(rendered,cJSON_CreateNumber(sample.rendered[i]));
+        }
+    }
     return json;
 }
+cJSON *app_sd_files_json(void) {
+    recorder_sd_file_t files[32];size_t count=0;bool truncated=false;
+    esp_err_t err=recorder_list_sd(files,32,&count,&truncated);
+    cJSON *json=cJSON_CreateObject();if(!json)return NULL;
+    cJSON_AddBoolToObject(json,"ok",err==ESP_OK);
+    if(err!=ESP_OK)cJSON_AddStringToObject(json,"error","SD unavailable or busy");
+    cJSON_AddBoolToObject(json,"truncated",truncated);
+    cJSON *array=cJSON_AddArrayToObject(json,"files");
+    for(size_t i=0;array && i<count;++i) {
+        cJSON *item=cJSON_CreateObject();if(!item)continue;
+        cJSON_AddStringToObject(item,"name",files[i].name);cJSON_AddNumberToObject(item,"bytes",files[i].bytes);
+        cJSON_AddItemToArray(array,item);
+    }
+    return json;
+}
+static esp_err_t sd_files_get(httpd_req_t *req) {return json_response(req,app_sd_files_json());}
 static esp_err_t state_get(httpd_req_t *req) {
     return json_response(req, app_state_json());
 }
@@ -165,8 +205,47 @@ static cJSON *read_body(httpd_req_t *req) {
     if (!cJSON_IsObject(json)) { cJSON_Delete(json); json_error(req, "400 Bad Request", "Invalid JSON object"); return NULL; }
     return json;
 }
+static bool uint32_field(cJSON *body,const char *name,uint32_t *out) {
+    cJSON *v=cJSON_GetObjectItemCaseSensitive(body,name);
+    if(!cJSON_IsNumber(v) || !isfinite(v->valuedouble) || v->valuedouble<0 ||
+       v->valuedouble>UINT32_MAX || floor(v->valuedouble)!=v->valuedouble) return false;
+    *out=(uint32_t)v->valuedouble; return true;
+}
+static esp_err_t sound_command(const char *path,cJSON *body) {
+    cJSON *owner=cJSON_GetObjectItemCaseSensitive(body,"owner");
+    if(!cJSON_IsString(owner) || strlen(owner->valuestring)!=16) return ESP_ERR_INVALID_ARG;
+    if(!strcmp(path,"/api/sound/begin")) {
+        const char *const fields[]={"owner","storage","frames","crc32"};
+        cJSON *storage=cJSON_GetObjectItemCaseSensitive(body,"storage"); uint32_t frames,crc;
+        if(!fields_match(body,fields,4) || !cJSON_IsString(storage) ||
+           !uint32_field(body,"frames",&frames) || !uint32_field(body,"crc32",&crc)) return ESP_ERR_INVALID_ARG;
+        unsigned target=!strcmp(storage->valuestring,"flash")?REC_FLASH:!strcmp(storage->valuestring,"sd")?REC_SD:99;
+        return key_sound_begin(owner->valuestring,target,frames,crc);
+    }
+    if(!strcmp(path,"/api/sound/chunk")) {
+        const char *const fields[]={"owner","offset","pcm","crc32"};
+        cJSON *pcm=cJSON_GetObjectItemCaseSensitive(body,"pcm"); uint32_t offset,crc; uint8_t bytes[1024]; size_t count=0;
+        if(!fields_match(body,fields,4) || !cJSON_IsString(pcm) || strlen(pcm->valuestring)>1368 ||
+           !uint32_field(body,"offset",&offset) || !uint32_field(body,"crc32",&crc) ||
+           mbedtls_base64_decode(bytes,sizeof(bytes),&count,(const unsigned char*)pcm->valuestring,strlen(pcm->valuestring)))
+            return ESP_ERR_INVALID_ARG;
+        return key_sound_chunk(owner->valuestring,offset,bytes,count,crc);
+    }
+    const char *const fields[]={"owner"};
+    if(!fields_match(body,fields,1)) return ESP_ERR_INVALID_ARG;
+    if(!strcmp(path,"/api/sound/commit")) return key_sound_commit(owner->valuestring);
+    if(!strcmp(path,"/api/sound/cancel")) return key_sound_cancel(owner->valuestring);
+    return ESP_ERR_INVALID_ARG;
+}
 esp_err_t app_command_execute(const char *path, cJSON *body) {
     esp_err_t result = ESP_ERR_INVALID_ARG;
+    if(!strcmp(path,"/api/device/restart")) {
+        const char *const fields[]={"mode"};cJSON *mode=cJSON_GetObjectItemCaseSensitive(body,"mode");
+        if(!fields_match(body,fields,1) || !cJSON_IsString(mode) ||
+           (strcmp(mode->valuestring,"bootloader") && strcmp(mode->valuestring,"run")))return ESP_ERR_INVALID_ARG;
+        return device_request_restart(!strcmp(mode->valuestring,"bootloader"));
+    }
+    if (!strncmp(path,"/api/sound/",11)) return sound_command(path,body);
     if (!strcmp(path, "/api/config")) {
         keypad_config_t config;
         if (parse_config(body, &config)) result = app_apply_config(&config);
@@ -208,7 +287,15 @@ static esp_err_t command_post(httpd_req_t *req) {
     return operation_response(req, result);
 }
 static esp_err_t file_get(httpd_req_t *req) {
-    char filename[16]; esp_err_t err = recorder_download_begin(filename);
+    char filename[16];esp_err_t err;
+    if(!strcmp(req->uri,"/api/recording.wav"))err=recorder_download_begin(filename);
+    else {
+        char query[64];
+        if(httpd_req_get_url_query_str(req,query,sizeof(query))!=ESP_OK ||
+           httpd_query_key_value(query,"name",filename,sizeof(filename))!=ESP_OK)
+            return json_error(req,"400 Bad Request","Missing SD audio filename");
+        err=recorder_download_sd_begin(filename);
+    }
     if (err != ESP_OK) return json_error(req, "409 Conflict", "Finish recording before downloading");
     char disposition[80]; snprintf(disposition, sizeof(disposition), "attachment; filename=\"%s\"", filename);
     httpd_resp_set_type(req, "audio/wav"); httpd_resp_set_hdr(req, "Content-Disposition", disposition);
@@ -279,7 +366,7 @@ esp_err_t web_server_start(void) {
     if (err == ESP_OK) err = esp_wifi_set_config(WIFI_IF_AP, &wifi);
     if (err == ESP_OK) err = esp_wifi_start();
     if (err != ESP_OK) return err;
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG(); config.stack_size = 8192; config.max_uri_handlers = 16;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG(); config.stack_size = 8192; config.max_uri_handlers = 24;
     config.max_open_sockets = 6; config.lru_purge_enable = true; config.recv_wait_timeout = 3; config.send_wait_timeout = 3;
     httpd_handle_t server; err = httpd_start(&server, &config); if (err != ESP_OK) return err;
     const char *assets[] = {"/", "/app.js", "/style.css"};
@@ -291,11 +378,15 @@ esp_err_t web_server_start(void) {
     err = httpd_register_uri_handler(server, &state); if (err != ESP_OK) return err;
     httpd_uri_t file = {.uri = "/api/recording.wav", .method = HTTP_GET, .handler = file_get};
     err = httpd_register_uri_handler(server, &file); if (err != ESP_OK) return err;
+    httpd_uri_t sd_files={.uri="/api/sd/files",.method=HTTP_GET,.handler=sd_files_get};
+    err=httpd_register_uri_handler(server,&sd_files);if(err!=ESP_OK)return err;
+    httpd_uri_t sd_file={.uri="/api/sd/recording.wav",.method=HTTP_GET,.handler=file_get};
+    err=httpd_register_uri_handler(server,&sd_file);if(err!=ESP_OK)return err;
     httpd_uri_t audio = {.uri = "/api/audio", .method = HTTP_GET, .handler = audio_get};
     err = httpd_register_uri_handler(server, &audio); if (err != ESP_OK) return err;
     httpd_uri_t microphone = {.uri = "/api/microphone", .method = HTTP_GET, .handler = microphone_get};
     err = httpd_register_uri_handler(server, &microphone); if (err != ESP_OK) return err;
-    const char *commands[] = {"/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/microphone/channel"};
+    const char *commands[] = {"/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/microphone/channel", "/api/sound/begin", "/api/sound/chunk", "/api/sound/commit", "/api/sound/cancel", "/api/device/restart"};
     for (unsigned i = 0; i < sizeof(commands) / sizeof(commands[0]); ++i) {
         httpd_uri_t uri = {.uri = commands[i], .method = HTTP_POST, .handler = command_post};
         err = httpd_register_uri_handler(server, &uri); if (err != ESP_OK) return err;

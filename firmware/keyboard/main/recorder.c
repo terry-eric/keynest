@@ -1,9 +1,11 @@
 #include "recorder.h"
+#include "key_sound.h"
 #include "flash_store.h"
 #include "app_logic.h"
 #include "pcb2_board.h"
 #include "sdkconfig.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -15,6 +17,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 enum { CMD_START, CMD_MOUNT };
 #define STREAM_FRAMES 8192U
@@ -44,6 +47,7 @@ esp_err_t recorder_stop(void) {
     xSemaphoreGive(mutex); return ESP_OK;
 }
 esp_err_t recorder_begin(unsigned target, const char *owner) {
+    if (key_sound_busy()) return ESP_ERR_INVALID_STATE;
     if (target > REC_SD || (target == REC_BROWSER && (!owner || strlen(owner) != 16))) return ESP_ERR_INVALID_ARG;
     xSemaphoreTake(mutex, portMAX_DELAY);
     if (status.mounting || status.downloading || writer_open || (status.state != REC_IDLE && status.state != REC_ERROR) ||
@@ -94,6 +98,7 @@ esp_err_t recorder_stream_read(const char *owner, int16_t *buffer, size_t capaci
     xSemaphoreGive(mutex); return ESP_OK;
 }
 esp_err_t recorder_download_begin(char filename[16]) {
+    if(key_sound_busy()) return ESP_ERR_INVALID_STATE;
     xSemaphoreTake(mutex, portMAX_DELAY);
     if (writer_open || status.mounting || status.downloading ||
         (status.state != REC_IDLE && status.state != REC_ERROR) || !status.filename[0]) {
@@ -120,6 +125,43 @@ static bool recording_name(const char *name) {
     if (strlen(name) != 12 || strncmp(name, "REC", 3) || strcmp(name + 8, ".WAV")) return false;
     for (unsigned i = 3; i < 8; ++i) if (name[i] < '0' || name[i] > '9') return false;
     return true;
+}
+static bool sound_file_name(const char *name) {
+    if(!name || strlen(name)!=12 || (strncmp(name,"REC",3) && strncmp(name,"KEY",3)) || strcmp(name+8,".WAV")) return false;
+    for(unsigned i=3;i<8;++i)if(name[i]<'0'||name[i]>'9')return false;
+    return true;
+}
+static esp_err_t reserve_sd(void) {
+    if(key_sound_busy())return ESP_ERR_INVALID_STATE;
+    xSemaphoreTake(mutex,portMAX_DELAY);
+    bool ok=status.sd_ready && !status.mounting && !status.downloading && !writer_open &&
+            (status.state==REC_IDLE || status.state==REC_ERROR);
+    if(ok)status.downloading=true;
+    xSemaphoreGive(mutex);return ok?ESP_OK:ESP_ERR_INVALID_STATE;
+}
+esp_err_t recorder_download_sd_begin(const char *name) {
+    if(!sound_file_name(name))return ESP_ERR_INVALID_ARG;
+    esp_err_t err=reserve_sd();if(err!=ESP_OK)return err;
+    char path[40];snprintf(path,sizeof(path),"/sdcard/%s",name);
+    download_file=fopen(path,"rb");
+    if(!download_file){recorder_download_end();return ESP_ERR_NOT_FOUND;}
+    return ESP_OK;
+}
+esp_err_t recorder_list_sd(recorder_sd_file_t *files,size_t capacity,size_t *count,bool *truncated) {
+    *count=0;*truncated=false;
+    esp_err_t err=reserve_sd();if(err!=ESP_OK)return err;
+    DIR *dir=opendir("/sdcard");
+    if(!dir){recorder_download_end();return ESP_FAIL;}
+    struct dirent *entry;unsigned scanned=0;
+    while((entry=readdir(dir))) {
+        if(++scanned>256 || *count>=capacity){*truncated=true;break;}
+        if(!sound_file_name(entry->d_name))continue;
+        char path[40];snprintf(path,sizeof(path),"/sdcard/%.12s",entry->d_name);
+        struct stat st;if(stat(path,&st) || !S_ISREG(st.st_mode) || st.st_size<44 || st.st_size>44+CAPTURE_RATE*300*2)continue;
+        snprintf(files[*count].name,sizeof(files[*count].name),"%.12s",entry->d_name);
+        files[*count].bytes=st.st_size;++*count;
+    }
+    closedir(dir);recorder_download_end();return ESP_OK;
 }
 static void mount_card(void) {
     if (!pcb2_sd_is_mounted()) pcb2_sd_unmount();
@@ -170,7 +212,8 @@ static void worker(void *unused) {
             recorder_status_t snapshot; recorder_snapshot(&snapshot); if (snapshot.state != REC_STARTING) continue;
             xQueueReset(packets); written = 0; target = snapshot.target; started = esp_timer_get_time();
             if (target == REC_FLASH) {
-                ram = malloc(FLASH_CAPTURE_FRAMES * sizeof(int16_t));
+                ram = heap_caps_malloc(FLASH_CAPTURE_FRAMES * sizeof(int16_t),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+                if(!ram)ram = malloc(FLASH_CAPTURE_FRAMES * sizeof(int16_t));
                 if (!ram) { error_message("Not enough RAM for internal Flash recording"); continue; }
             } else if (target == REC_SD) {
                 file = new_file(name);
