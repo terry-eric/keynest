@@ -230,7 +230,7 @@
     },
     {
       "path": "tools/keypad_usb.py",
-      "sha256": "986184bd9d7673e89e96cf02921df963f34bcbf1d72c7a32261d10d68ff1322d"
+      "sha256": "546f4745990afee108c839d3eda07c842d79e72314898a1abeb025a340f6d38c"
     },
     {
       "path": "tools/monitor-test-includes/esp_timer.h",
@@ -274,7 +274,7 @@
     },
     {
       "path": "tools/test-keypad-usb.py",
-      "sha256": "2fc173ce6fa1fea0bf43c34cce23412960933be3f34ba7a39373b6f1723285aa"
+      "sha256": "43f4162eb9dbef82100d61a9fc470eb061419a672f4073d302eb47c34534c1f4"
     },
     {
       "path": "tools/test-keypad-web.cjs",
@@ -301,19 +301,20 @@
     "Intermittent SD capacity / mount / CRC failures",
     "Microphone human speech quality",
     "SD custom sound persistence",
-    "Physical macro keyboard input",
     "Macro program NVS persistence across restart",
-    "macOS and Linux Unicode input"
+    "macOS and Linux Unicode input",
+    "Windows Unicode text, multi-key and multi-step physical macro input"
   ],
   "validated": [
     "v8 host protocol, Unicode and macro-store tests",
     "v8 ESP-IDF build",
     "v8 bootloader and app independent Flash verification",
     "v8 persistent settings and audio preservation",
-    "v8 runtime macro API and Windows companion connection"
+    "v8 runtime macro API and Windows companion connection",
+    "Windows physical key Ctrl+C macro; user confirmed Ctrl+V paste"
   ],
   "elf": "Same build with debug sections removed for public distribution. Flashing and independent verification use firmware.bin; ELF is not flashed.",
-  "validation": "Bootloader and app flashed on one PCB2, independently verified; persistent settings/audio preserved and macro API read. Actual macro keyboard input remains untested.",
+  "validation": "Bootloader and app independently flash-verified; settings/audio preserved. Windows physical Ctrl+C macro and paste result confirmed by user; Unicode and multi-step input remain pending.",
   "physical_validation": {
     "date": "2026-10-14",
     "boards": 1,
@@ -324,7 +325,11 @@
     "macro_programs_read": 4,
     "psram_bytes": 2097152,
     "windows_companion_connected": true,
-    "macro_input_tested": false,
-    "macro_persistence_tested": false
-  }
+    "macro_input_tested": true,
+    "macro_persistence_tested": false,
+    "macro_input_scope": "Windows physical Ctrl+C chord; paste result confirmed by user",
+    "windows_companion_events_completed": 3
+  },
+  "source_snapshot_updated_at": "2026-10-14",
+  "source_snapshot_note": "Host USB tools refreshed after tested connection fixes; firmware sources and all build artifacts unchanged."
 }

@@ -4,14 +4,15 @@
 
 - 更新前完整備份 4 MB Flash 並核對原分割表與 v8 相同；只寫入 bootloader `0x0` 與 app `0x10000`。兩個映像皆由獨立 `verify_flash` 通過校驗。
 - 燒錄後、重啟前，原分割表／NVS／PHY 區及 Flash 錄音、按鍵音區逐 byte 比對一致。自動重啟成功，應用設定與更新前一致；實機辨識 2,097,152 bytes PSRAM，音訊與內建 Flash 就緒。
-- USB 回報 macro API version 1，四份 program 可讀取；本板目前沒有啟用巨集。Windows pynput 輸入後端已初始化，桌面工具與板子的 host lease 已連接；本機控制台顯示實板連線、可編輯按鍵。沒有自動輸入測試文字。
+- USB 回報 macro API version 1，四份 program 可讀取；更新後首次讀取尚無巨集，後續已保存並啟用第 1 顆鍵的 Ctrl+C 組合。Windows pynput 輸入後端已初始化，桌面工具與板子的 host lease 已連接；本機控制台顯示實板連線、可編輯按鍵。
+- 使用者在 Windows 以第 1 顆實體鍵執行 Ctrl+C，並確認 Ctrl+V 能貼上選取的測試文字。桌面工具回報收到 3 次事件、完成 3 次、失敗 0 次；此結果驗證實體事件至桌面組合鍵輸出的流程，不涵蓋中文文字、多步巨集或重啟恢復。
 
 - 新增 4 顆鍵的文字／多鍵／巨集 NVS 設定，以獨立 namespace 保存，不修改 v7 設定 blob 或分割區。每顆最多 16 步、每個 chord 最多 16 鍵、文字每段 512 UTF-8 bytes，整段 1200 bytes。
 - 普通快捷鍵維持原 USB HID。巨集鍵不會同時送出舊的 HID 按鍵；只在按下緣產生一次實體事件，由明確啟用的桌面工具執行。網頁效果測試不觸發文字。
 - C 主機測試通過：中文／emoji、欄位與 NUL 驗證、重複鍵拒絕、NVS 寫入失敗時保留原動作、單一 host lease、忙碌／未連接時丟棄、取走確認、逾期事件不補送。桌面工具先 ACK 再輸入，回覆不確定時不重送輸入。
-- 桌面工具 7 項主機測試通過：多鍵與 Unicode 步驟、先驗證整段、ACK 失敗不輸入、等待取消、輸入失敗的按鍵釋放、Wayland 文字 stdin、本機 HTTP 的 Host／Origin／檔案範圍限制。測試使用模擬輸入，沒有對目前電腦送出真實按鍵。
-- USB 13 項既有／新增測試、Web Serial、WAV／PCM、自訂音效裁切／CRC、前端巨集驗證與建置測試通過。GPIO、Quad PSRAM 設定、左麥克風 slot 與固定分割區已核對。
-- 實際按鍵巨集事件、巨集 program 的 NVS 重啟恢復、Windows／macOS／Linux 中文輸入、實體多鍵輸入尚未測試。Linux Wayland 取決於 virtual-keyboard 協定，不能保證所有桌面環境可用。
+- 桌面工具 8 項主機測試通過：多鍵與 Unicode 步驟、先驗證整段、ACK 失敗不輸入、等待取消、輸入失敗的按鍵釋放、Wayland 文字 stdin、本機 HTTP 的 Host／Origin／檔案範圍限制及 USB 重連錯誤清除。自動化測試使用模擬輸入；真實輸入另由上述使用者實測確認。
+- USB 14 項既有／新增測試、Web Serial、WAV／PCM、自訂音效裁切／CRC、前端巨集驗證與建置測試通過。GPIO、Quad PSRAM 設定、左麥克風 slot 與固定分割區已核對。韌體映像與韌體來源保持不變，manifest 另更新已測試的主機 USB 工具來源雜湊。
+- 巨集 program 的 NVS 重啟恢復、Windows／macOS／Linux 中文輸入、多個一般鍵同時輸入與多步巨集尚未實測。Linux Wayland 取決於 virtual-keyboard 協定，不能保證所有桌面環境可用。
 - 麥克風人聲品質、SD 不穩定及 USB 音效 CRC 根因仍未解決。
 
 ## v7 實機歷史紀錄
