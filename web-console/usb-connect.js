@@ -1,5 +1,17 @@
 "use strict";
-
+function pcb2ConnectionView({companion=false,connected=false,working=false,state=null,error="",supported=true,demo=false}) {
+  if(demo)return {title:"介面體驗",description:"目前沒有控制實體鍵盤。",keyboard:"模擬鍵盤",macro:"模擬動作",macroReady:false,note:"所有按鍵與聲音都是展示資料。",issue:false,choose:"連接鍵盤",hideChoose:true};
+  const version=state?.macros?.version===1, macroReady=connected&&companion&&!!state?.companion_ready;
+  const inputIssue=connected&&companion?state?.companion_error||"":"";
+  const keyboard=working?"鍵盤：連接中…":connected?"鍵盤：已連接":"鍵盤：未連接";
+  const macro=!connected?"文字與巨集：尚未就緒":!version?"文字與巨集：需更新韌體":!companion?"文字與巨集：需桌面模式":inputIssue?"文字與巨集：需檢查":macroReady?"文字與巨集：可用":"文字與巨集：等待工具";
+  const title=working?"正在連接你的鍵盤":!supported?"換到支援 USB 的瀏覽器":!connected?companion?"桌面工具正在等待鍵盤":"先接上你的四鍵鍵盤":companion?macroReady&&!inputIssue?"鍵盤與巨集已就緒":"鍵盤已連接":"鍵盤已連接，可開始設定";
+  const description=companion?connected?"在這裡設定按鍵與巨集，保留桌面工具執行即可。":"插上 USB 資料線；桌面工具會自動偵測，不必在網站重複連接。":supported?"快捷鍵、燈光與錄音直接透過 USB 設定。文字與多鍵巨集請使用桌面模式。":"請使用電腦版 Chrome／Edge，或改用桌面模式。";
+  const note=error||inputIssue||(working?"正在讀取鍵盤設定…":connected?companion?"切到想操作的程式，再按實體鍵；巨集會輸入到目前使用的程式。":"普通快捷鍵可直接使用；文字與多鍵巨集需切換桌面模式。":companion?"若其他網站或串列監控正連接鍵盤，請先中斷那邊的連線。":"第一次按「連接鍵盤」，選擇 PCB2 的 USB 裝置。電腦保持原本 Wi-Fi。");
+  return {title,description,keyboard,macro,macroReady:macroReady&&!inputIssue,note,issue:!!(error||inputIssue),choose:working?"正在連接…":companion?"重新檢查鍵盤":connected?"更換裝置":"連接鍵盤",hideChoose:companion&&connected};
+}
+if(typeof module==="object"&&module.exports)module.exports={pcb2ConnectionView};
+else {
 window.PCB2Transport = new URLSearchParams(location.search).get("companion") === "1" && ["127.0.0.1", "localhost"].includes(location.hostname) ? new PCB2CompanionTransport() : new PCB2SerialTransport();
 document.addEventListener("DOMContentLoaded", () => {
   const $ = id => document.getElementById(id), serial = navigator.serial, demo = new URLSearchParams(location.search).get("demo") === "1";
@@ -12,16 +24,20 @@ document.addEventListener("DOMContentLoaded", () => {
   function update() {
     if (transport.connected) connectionError = "";
     const supported = companion || !!serial && window.isSecureContext;
+    const view=pcb2ConnectionView({companion,connected:transport.connected,working,state:transport.lastState,error:transport.connectionError||connectionError,supported,demo});
     ["serial-choose", "serial-ports", "serial-auto"].forEach(id => $(id).disabled = !supported || demo || working || transport.busy);
     $("serial-connect").disabled = !supported || demo || working || transport.busy || !ports.length;
     $("serial-disconnect").disabled = !transport.connected || working || transport.busy;
-    $("serial-status").textContent = demo ? "介面體驗" : transport.connected ? "已連接" : working ? "連接中…" : "尚未連接";
+    $("serial-status").textContent = view.keyboard;
     $("serial-status").classList.toggle("active", transport.connected);
-    if (!demo) note(transport.connectionError || connectionError || (working ? "正在確認 PCB2 USB 裝置…" : transport.connected ? transport.busy ? "錄音或檔案操作中，完成後可切換裝置。" : companion ? "桌面工具已連接鍵盤；文字與巨集會輸入到目前使用的程式。" : "USB 已連接。文字與多鍵巨集請改用下方桌面控制台。" : "尚未連接鍵盤；接上 USB 資料線後再連接。"), !!(transport.connectionError || connectionError));
-    $("serial-choose").textContent = transport.connected ? "切換鍵盤" : working ? "正在連接…" : "連接鍵盤";
-    $("usb-connect-title").textContent = demo ? "先試試怎麼設定" : transport.connected ? "鍵盤已連接" : "先連接你的鍵盤";
-    $("usb-connect-description").textContent = transport.connected ? "選一顆鍵，開始設定常用操作。" : "插上 USB 資料線，第一次連接時選擇 PCB2 裝置。";
-    if (companion) { $("serial-choose").textContent = "重新連接鍵盤"; $("serial-ports").disabled = $("serial-connect").disabled = $("serial-disconnect").disabled = $("serial-auto").disabled = true; $("usb-connect-description").textContent = "桌面工具管理 USB；請保持工具執行，公開網站的 USB 連線需先中斷。"; }
+    $("macro-connection-status").textContent=view.macro;$("macro-connection-status").classList.toggle("active",view.macroReady);
+    note(view.note,view.issue);
+    $("serial-choose").textContent=view.choose;$("serial-choose").hidden=view.hideChoose;
+    $("serial-choose").classList.toggle("primary",!transport.connected);$("serial-choose").classList.toggle("secondary",transport.connected);
+    $("usb-connect-title").textContent=view.title;$("usb-connect-description").textContent=view.description;
+    $("usb-mode-label").textContent=companion?"桌面模式":"瀏覽器模式";
+    document.querySelector(".usb-more").hidden=companion;
+    if (companion) { $("serial-ports").disabled = $("serial-connect").disabled = $("serial-disconnect").disabled = $("serial-auto").disabled = true; }
   }
   transport.onChange = update;
   try { $("serial-auto").checked = localStorage.getItem("pcb2-auto-connect") !== "false"; } catch {}
@@ -75,3 +91,4 @@ document.addEventListener("DOMContentLoaded", () => {
   }).catch(error => note(error.message, true));
   update();
 });
+}

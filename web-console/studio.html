@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="zh-Hant">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111318"><title>PCB2 · 我的快捷鍵</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./usb-connect.css"><link rel="stylesheet" href="./studio.css"><script src="./usb-serial.js" defer></script><script src="./companion.js" defer></script><script src="./usb-connect.js" defer></script><script src="./app.js" defer></script><script src="./studio.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#131820"><title>PCB2 · 我的快捷鍵</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./usb-connect.css"><link rel="stylesheet" href="./studio.css"><script src="./gsap.min.js" defer></script><script src="./usb-serial.js" defer></script><script src="./companion.js" defer></script><script src="./usb-connect.js" defer></script><script src="./app.js" defer></script><script src="./studio.js" defer></script></head>
 <body class="studio">
 <header class="topbar"><a class="brand" href="./"><span class="brandmark">P2</span><span>PCB2<span class="brand-sub">我的四鍵工作台</span></span></a><span class="connection" id="connection" role="status"><i></i>等待鍵盤</span></header>
 <main>
-  <div class="heading"><div><p class="eyebrow">一顆鍵，少做幾個步驟</p><h1>你的常用操作，放在手邊<span class="dot">。</span></h1><p class="subtitle" id="page-subtitle">點選一顆鍵，設定它要幫你做什麼。</p></div></div>
+  <div class="heading"><div><h1>我的四鍵鍵盤</h1><p class="subtitle" id="page-subtitle">選一顆鍵，直接按下你想用的組合。</p></div></div>
   {{USB}}
   <div class="offline" id="offline" hidden><strong>等待連接</strong><span>接上 USB 後即可讀取鍵盤設定。</span></div>
   <div class="demo-banner" id="demo-banner" hidden>介面體驗 · 所有設定與音量都是模擬的，不會控制實體鍵盤。<a href="./">返回 USB 連接</a></div>
@@ -27,5 +27,5 @@
   <details class="device-options"><summary>裝置與進階選項</summary><div class="device-option-actions"><button class="quiet" id="reconnect">重新讀取狀態</button><button class="quiet" id="usb-update" hidden>切換韌體更新模式</button><button class="quiet" id="preview-close" hidden>關閉桌面工具</button></div><p class="caption">更新模式會中斷鍵盤連線，只有準備更新韌體時才使用。</p></details>
   <footer><span>PCB2 · 四鍵工作台</span><span id="device-address">USB 連接 · 保持原本 Wi-Fi</span></footer>
 </main><div class="toast" id="toast" role="status" hidden></div>
-<dialog id="shortcut-dialog" aria-labelledby="capture-title"><form method="dialog"><button class="dialog-close" aria-label="關閉快捷鍵擷取">×</button></form><p class="eyebrow">設定快捷鍵</p><h2 id="capture-title">按下你想用的快捷鍵</h2><p>按住 Ctrl、Shift、Alt 或 ⌘／Win，再按一個鍵。</p><strong id="capture-value" aria-live="polite">等待你的按鍵…</strong><p id="capture-note">按 Esc 取消；Esc 本身可在下方選單設定。</p><button class="button primary" id="capture-confirm" disabled>使用這個快捷鍵</button><p class="caption">部分系統快捷鍵會由電腦攔截，請改用選單設定。</p></dialog>
+<dialog id="shortcut-dialog" aria-labelledby="capture-title"><form method="dialog"><button class="dialog-close" aria-label="關閉快捷鍵擷取">×</button></form><h2 id="capture-title">按下你想用的快捷鍵</h2><p id="capture-instructions">按住 Ctrl、Shift、Alt 或 ⌘／Win，再按一個鍵。</p><div id="capture-pad" tabindex="0" role="group" aria-label="按鍵擷取區" aria-describedby="capture-note" hidden>在這裡按鍵，會自動加入組合</div><strong id="capture-value" aria-live="polite">等待你的按鍵…</strong><div id="capture-chips" aria-label="已擷取的按鍵"></div><div id="capture-specials" class="capture-specials" hidden><button id="capture-tab" type="button">加入 Tab</button><button id="capture-esc" type="button">加入 Esc</button></div><p id="capture-note">按 Esc 取消；Esc 本身可在下方選單設定。</p><div class="capture-actions"><button class="button secondary" id="capture-reset" hidden>清除重錄</button><button class="button primary" id="capture-confirm" disabled>使用這個快捷鍵</button></div><p class="caption">部分系統快捷鍵會由電腦攔截，請改用選單設定。</p></dialog>
 </body></html>

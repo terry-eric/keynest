@@ -64,12 +64,12 @@ def build(output, base_path="pcb2"):
     # Supply the USB fetch implementation lexically; retain the entire maintained UI.
     app = (ui / "app.js").read_text(encoding="utf-8")
     (destination / "app.js").write_text('(function(fetch) {\n' + app + '\n})((...args) => window.PCB2Transport.fetch(...args));\n', encoding="utf-8", newline="\n")
-    files = {"style.css":ui / "style.css", **{name:extra / name for name in ("usb-serial.js", "usb-connect.js", "usb-connect.css", "studio.js", "studio.css", "companion.js")}}
+    files = {"style.css":ui / "style.css", "gsap.min.js":extra / "vendor/gsap.min.js", **{name:extra / name for name in ("usb-serial.js", "usb-connect.js", "usb-connect.css", "studio.js", "studio.css", "companion.js")}}
     for name, source in files.items():
         (destination / name).write_bytes(source.read_bytes())
     (output / "_headers").write_text('/' + base_path + '/*\n  Permissions-Policy: serial=(self)\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Content-Security-Policy: default-src \'self\'; script-src \'self\' https://static.cloudflareinsights.com; style-src \'self\' \'unsafe-inline\'; media-src \'self\' blob:; img-src \'self\' data:; connect-src \'self\' https://cloudflareinsights.com; object-src \'none\'; base-uri \'self\'; frame-ancestors \'none\'\n', encoding="utf-8", newline="\n")
     metadata = {"source":"firmware/keyboard/main/web", "base_path":"/" + base_path + "/",
-                "studio_version":2,
+                "studio_version":3,
                 "ui_sha256":{name:hashlib.sha256((ui / name).read_bytes()).hexdigest() for name in ("index.html", "app.js", "style.css")}}
     (destination / "build-info.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8", newline="\n")
     return destination

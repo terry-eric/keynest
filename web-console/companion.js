@@ -9,7 +9,7 @@ class PCB2CompanionTransport {
       throw error;
     }
     if (path === "/api/state" && response.ok) {
-      const state = await response.clone().json(); this.connected = true; this.connectionError = "";
+      const state = await response.clone().json(); this.lastState = state; this.connected = true; this.connectionError = "";
       this.busy = [1,2,3].includes(state.recording?.state) || !!state.recording?.downloading || !!state.custom_sound?.uploading;
       this.onChange?.();
     } else if (path === "/api/state" && !response.ok) {

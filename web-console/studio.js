@@ -34,7 +34,25 @@ function pcb2Shortcut(event) {
   if (!code || event.isComposing || event.repeat) return null;
   return {code, modifiers:[event.ctrlKey,event.shiftKey,event.altKey,event.metaKey]};
 }
-if (typeof module === "object" && module.exports) module.exports = {pcb2Chord, pcb2ValidateProgram, pcb2Shortcut};
+function pcb2CapturedKey(event) {
+  if(event.isComposing || event.repeat)return null;
+  if(/^Key[A-Z]$/.test(event.code))return event.code.slice(3);
+  if(/^Digit[0-9]$/.test(event.code))return event.code.slice(5);
+  if(/^F(?:[1-9]|1[0-9]|2[0-4])$/.test(event.code))return event.code;
+  const names={ControlLeft:"CTRL",ControlRight:"RCTRL",ShiftLeft:"SHIFT",ShiftRight:"RSHIFT",AltLeft:"ALT",AltRight:"RALT",MetaLeft:"META",MetaRight:"RMETA",Enter:"ENTER",Escape:"ESC",Backspace:"BACKSPACE",Tab:"TAB",Space:"SPACE",CapsLock:"CAPSLOCK",Insert:"INSERT",Home:"HOME",PageUp:"PAGEUP",Delete:"DELETE",End:"END",PageDown:"PAGEDOWN",ArrowLeft:"LEFT",ArrowRight:"RIGHT",ArrowUp:"UP",ArrowDown:"DOWN",Minus:"-",Equal:"=",BracketLeft:"[",BracketRight:"]",Backslash:"\\",Semicolon:";",Quote:"'",Backquote:"`",Comma:",",Period:".",Slash:"/",PrintScreen:"PRINTSCREEN",ScrollLock:"SCROLLLOCK",Pause:"PAUSE",NumLock:"NUMLOCK",AudioVolumeUp:"VOLUMEUP",AudioVolumeDown:"VOLUMEDOWN",AudioVolumeMute:"MUTE",MediaPlayPause:"PLAYPAUSE",MediaTrackNext:"NEXT",MediaTrackPrevious:"PREVIOUS"};
+  return names[event.code]||null;
+}
+function pcb2AppendCaptured(keys,event) {
+  const key=pcb2CapturedKey(event);if(!key)return keys.slice();
+  const result=keys.slice();
+  // Recover modifiers already held before the dialog received focus.
+  for(const [flag,left,right] of [["ctrlKey","CTRL","RCTRL"],["shiftKey","SHIFT","RSHIFT"],["altKey","ALT","RALT"],["metaKey","META","RMETA"]])
+    if(event[flag] && key!==left && key!==right && !result.includes(left) && !result.includes(right))result.push(left);
+  if(!result.includes(key))result.push(key);
+  if(result.length>16)throw new Error("最多擷取 16 個不同按鍵，請移除一顆後再加入。");
+  return result;
+}
+if (typeof module === "object" && module.exports) module.exports = {pcb2Chord, pcb2ValidateProgram, pcb2Shortcut, pcb2CapturedKey, pcb2AppendCaptured};
 else {
   const transport = window.PCB2Transport, originalFetch = transport.fetch.bind(transport);
   let stateHandler = null;
@@ -49,7 +67,13 @@ else {
     const extraNames=new Map([[45,"−"],[46,"="],[47,"["],[48,"]"],[49,"\\"],[51,";"],[52,"'"],[53,"`"],[54,","],[55,"."],[56,"/"],[70,"Print Screen"],[71,"Scroll Lock"],[72,"Pause"],[83,"Num Lock"],[84,"數字鍵盤 /"],[85,"數字鍵盤 *"],[86,"數字鍵盤 −"],[87,"數字鍵盤 +"],[88,"數字鍵盤 Enter"],[99,"數字鍵盤 ."]]);
     for(let i=0;i<10;i++)extraNames.set(i?88+i:98,`數字鍵盤 ${i}`);
     rows.forEach(row=>{const select=row.querySelector("select");for(const [code,name] of extraNames)if(![...select.options].some(option=>Number(option.value)===code))select.add(new Option(name,code));});
-    let selected = 0, latest = null, loaded = demo, loading = false, loadFailed = false, saving = false, savedClick = false, capture = null, captureKey = 0;
+    let selected = 0, latest = null, loaded = demo, loading = false, loadFailed = false, saving = false, savedClick = false, capture = null, captureKey = 0, captureStep = null, capturedKeys = [];
+    const motionMedia=window.gsap?.matchMedia();let animate=()=>{};
+    motionMedia?.add("(prefers-reduced-motion: no-preference)",context=>{
+      context.add("animate",target=>window.gsap.fromTo(target,{scale:.96,autoAlpha:.55},{scale:1,autoAlpha:1,duration:.18,ease:"power2.out",overwrite:true,clearProps:"transform,opacity,visibility"}));
+      animate=target=>context.animate(target);return()=>{animate=()=>{};};
+    });
+    window.addEventListener("pagehide",()=>motionMedia?.revert(),{once:true});
     let programs = Array.from({length:4},()=>({name:"",steps:[]})), kinds = Array(4).fill("shortcut"); const changed = new Set();
     const ready = ()=>demo || $("connection").classList.contains("online");
     const supported = ()=>demo || latest?.macros?.version === 1;
@@ -78,6 +102,7 @@ else {
       const base=$("save-state").textContent;
       $("save-summary").textContent=!online?"接上鍵盤即可開始設定":saving?"正在儲存，請保持連線…":changed.size?`${changed.size} 顆按鍵有未儲存的動作`:base.includes("尚未套用")?"設定已修改，準備好就儲存":base.includes("尚未保存")?"目前已生效，重啟後還不會保留":"設定已儲存";
       $("save-help").textContent=changed.size?"文字與巨集會儲存到鍵盤；執行時請保持桌面工具開啟。":"儲存後，重新插拔鍵盤也會保留設定；暫時套用只在這次連接生效。";
+      if(online&&!changed.size&&kinds.some(kind=>kind!=="shortcut")&&!latest?.companion_ready){$("save-help").textContent="文字與多鍵動作已存到板子；切換到桌面控制台後才能執行。";}
       $("apply").hidden=changed.size>0;
       document.querySelector(".save-dock").dataset.macroDirty=String(changed.size>0);
       $("save").disabled=$("save").disabled||saving;
@@ -126,7 +151,9 @@ else {
         else if(step.type==="keys"){input.type="text";input.value=step.keys.join(" + ");input.placeholder="例如 CTRL + SHIFT + A + B";}
         else {input.type="number";input.min=0;input.max=5000;input.step=50;input.value=step.ms;}
         input.addEventListener("input",()=>{try{if(step.type==="keys")step.keys=pcb2Chord(input.value);else if(step.type==="text")step.text=input.value;else step.ms=Number(input.value); input.setCustomValidity("");$("macro-error").textContent="";}catch(error){if(step.type==="keys")step.keys=[];input.setCustomValidity(error.message);$("macro-error").textContent=error.message;}mark();counts();});
-        card.append(input);const help=document.createElement("p");help.className="caption";help.textContent=step.type==="keys"?"用 + 分隔。修飾鍵：CTRL、SHIFT、ALT、META（⌘／Win），也可使用 F1–F24、方向鍵與媒體鍵。":step.type==="text"?"支援中文與換行；每段最多 512 bytes。":"單位為毫秒，1000 = 1 秒。";card.append(help);$("macro-steps").append(card);
+        card.append(input);
+        if(step.type==="keys"){const button=document.createElement("button");button.type="button";button.className="button capture-chord";button.textContent="直接按鍵，幫我組合";button.setAttribute("aria-label",`擷取第 ${index+1} 步的組合鍵`);button.addEventListener("click",()=>openCapture(index));card.append(button);}
+        const help=document.createElement("p");help.className="caption";help.textContent=step.type==="keys"?"點「直接按鍵」後，按下要加入的鍵，不必手動輸入名稱；也可在上方修改。":step.type==="text"?"支援中文與換行；每段最多 512 bytes。":"單位為毫秒，1000 = 1 秒。";card.append(help);$("macro-steps").append(card);
       }); counts();
     }
     document.querySelectorAll("[data-add-step]").forEach(button=>button.addEventListener("click",()=>{if(programs[selected].steps.length>=16){toast("最多 16 個步驟。",true);return;}const type=button.dataset.addStep;programs[selected].steps.push(type==="keys"?{type,keys:["ENTER"]}:type==="text"?{type,text:""}:{type,ms:200});mark();renderSteps();}));
@@ -135,9 +162,32 @@ else {
       select.value=String(shortcut.code);[...row.querySelectorAll("input")].forEach((input,bit)=>input.checked=shortcut.modifiers[bit]);select.dispatchEvent(new Event("change",{bubbles:true}));
     }
     document.querySelectorAll("[data-preset]").forEach(button=>button.addEventListener("click",()=>{const presets={copy:6,paste:25,undo:29,space:44};setShortcut({code:presets[button.dataset.preset],modifiers:button.dataset.preset==="space"?[false,false,false,false]:[!mac,false,false,mac]},selected);}));
-    $("capture-shortcut").addEventListener("click",()=>{capture=null;captureKey=selected;$("capture-value").textContent="等待你的按鍵…";$("capture-confirm").disabled=true;$("shortcut-dialog").showModal();});
-    $("shortcut-dialog").addEventListener("keydown",event=>{if(event.key==="Escape"||event.target===$("capture-confirm"))return;event.preventDefault();event.stopPropagation();const result=pcb2Shortcut(event);if(!result)return;capture=result;$("capture-value").textContent=[...result.modifiers.map((value,i)=>value?["Ctrl","Shift","Alt",mac?"⌘":"Win"][i]:"").filter(Boolean),event.code.replace(/^Key|^Digit/,"")].join(" + ");$("capture-confirm").disabled=false;});
-    $("capture-confirm").addEventListener("click",()=>{if(capture)setShortcut(capture,captureKey);$("shortcut-dialog").close();});
+    function renderCapture(){
+      $("capture-value").textContent=captureStep===null?capture?.label||"等待你的按鍵…":capturedKeys.length?capturedKeys.join(" + "):"按下要加入的鍵…";
+      $("capture-confirm").disabled=captureStep===null?!capture:!capturedKeys.length;
+      $("capture-chips").replaceChildren();
+      if(captureStep!==null)capturedKeys.forEach((key,index)=>{const chip=document.createElement("button");chip.type="button";chip.className="captured-key";chip.textContent=key+" ×";chip.setAttribute("aria-label",`移除 ${key}`);chip.addEventListener("click",()=>{capturedKeys.splice(index,1);renderCapture();$("capture-pad").focus();});$("capture-chips").append(chip);});
+    }
+    function openCapture(step=null){
+      capture=null;captureKey=selected;captureStep=step;capturedKeys=[];
+      $("capture-title").textContent=step===null?"按下你想用的快捷鍵":"按鍵，我來幫你組合";
+      $("capture-instructions").textContent=step===null?"按住 Ctrl、Shift、Alt 或 ⌘／Win，再按一個鍵。":"按下要一起送出的鍵。每顆只加入一次，放開後仍保留。";
+      $("capture-confirm").textContent=step===null?"使用這個快捷鍵":"使用這組按鍵";
+      $("capture-reset").hidden=step===null;$("capture-pad").hidden=step===null;
+      $("capture-specials").hidden=step===null;
+      $("capture-note").textContent=step===null?"按 Esc 取消；Esc 本身可在選單設定。":"按 Tab 切換操作，Esc 取消；要加入這兩顆鍵，可用上方按鈕。完成後再儲存到鍵盤。";
+      renderCapture();$("shortcut-dialog").showModal();if(step!==null)$("capture-pad").focus();animate($("shortcut-dialog"));
+    }
+    $("capture-shortcut").addEventListener("click",()=>openCapture());
+    $("shortcut-dialog").addEventListener("keydown",event=>{
+      if(captureStep!==null){if(event.target!==$("capture-pad")||event.key==="Escape"||event.key==="Tab"&&!event.ctrlKey&&!event.altKey&&!event.metaKey)return;event.preventDefault();event.stopPropagation();try{const next=pcb2AppendCaptured(capturedKeys,event);if(next.join()!==capturedKeys.join()){capturedKeys=next;renderCapture();animate($("capture-value"));}else if(!pcb2CapturedKey(event)&&!event.repeat&&!event.isComposing)$("capture-note").textContent="這顆鍵目前不支援多鍵動作，請換其他按鍵。";}catch(error){$("capture-note").textContent=error.message;}return;}
+      if(event.key==="Escape"||event.target===$("capture-confirm")||event.target.closest("form"))return;
+      event.preventDefault();event.stopPropagation();const result=pcb2Shortcut(event);if(!result)return;
+      capture={...result,label:[...result.modifiers.map((value,i)=>value?["Ctrl","Shift","Alt",mac?"⌘":"Win"][i]:"").filter(Boolean),event.code.replace(/^Key|^Digit/,"")].join(" + ")};renderCapture();animate($("capture-value"));
+    });
+    for(const [id,code] of [["capture-tab","Tab"],["capture-esc","Escape"]])$(id).addEventListener("click",()=>{try{capturedKeys=pcb2AppendCaptured(capturedKeys,{code});renderCapture();$("capture-pad").focus();}catch(error){$("capture-note").textContent=error.message;}});
+    $("capture-reset").addEventListener("click",()=>{capturedKeys=[];renderCapture();$("capture-pad").focus();});
+    $("capture-confirm").addEventListener("click",()=>{if(captureStep===null){if(capture)setShortcut(capture,captureKey);}else if(capturedKeys.length){programs[captureKey].steps[captureStep].keys=capturedKeys.slice();changed.add(captureKey);renderSteps();status();}$("shortcut-dialog").close();});
     async function request(path,body) {
       const response=await transport.fetch(path,{method:body?"POST":"GET",headers:body?{"Content-Type":"application/json","X-PCB2-Control":"1"}:{},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(5000)});
       const result=await response.json();if(!response.ok)throw new Error(result.error||"鍵盤沒有接受這次設定。");return result;
@@ -164,7 +214,7 @@ else {
     $("sound-recording").addEventListener("click",()=>{document.querySelector(".custom-sound").open=true;});
     $("sd-file-sound").addEventListener("click",()=>{page("effects");document.querySelector(".custom-sound").open=true;});
     $("reconnect").addEventListener("click",()=>{if(!changed.size){loaded=false;loadFailed=false;}});
-    for(const id of ["serial-choose","serial-connect","serial-disconnect","desktop-console"]){$(id).addEventListener("click",event=>{if(changed.size){event.preventDefault();event.stopImmediatePropagation();toast("先儲存按鍵動作，再切換或中斷鍵盤。",true);}else if(id!=="serial-disconnect"){loaded=false;loadFailed=false;}},true);}
+    for(const id of ["serial-choose","serial-connect","serial-disconnect","desktop-console"]){$(id).addEventListener("click",event=>{if(changed.size||id==="desktop-console"&&$("save-state").textContent.includes("尚未套用")){event.preventDefault();event.stopImmediatePropagation();toast("先儲存目前的設定，再切換或中斷鍵盤。",true);}else if(id!=="serial-disconnect"){loaded=false;loadFailed=false;}},true);}
     new MutationObserver(()=>status()).observe($("save-state"),{childList:true,characterData:true,subtree:true});
     new MutationObserver(()=>{if(!ready()&&!changed.size){loaded=false;loadFailed=false;}status();}).observe($("connection"),{attributes:true,attributeFilter:["class"]});
     new MutationObserver(()=>status()).observe($("monitor-toggle"),{attributes:true,attributeFilter:["aria-pressed"]});

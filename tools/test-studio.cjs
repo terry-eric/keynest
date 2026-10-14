@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {pcb2Chord,pcb2ValidateProgram,pcb2Shortcut}=require('../web-console/studio.js');
+const {pcb2Chord,pcb2ValidateProgram,pcb2Shortcut,pcb2CapturedKey,pcb2AppendCaptured}=require('../web-console/studio.js');
 assert.deepEqual(pcb2Chord('ctrl + shift + A + B'),['CTRL','SHIFT','A','B']);
 for(const text of ['', 'CTRL +','A + A','EXEC + C',Array.from({length:17},(_,i)=>String.fromCharCode(65+i)).join('+')])assert.throws(()=>pcb2Chord(text));
 const program={name:'常用回覆',steps:[{type:'keys',keys:['META','C']},{type:'wait',ms:200},{type:'text',text:'你好，已收到！\n😀'}]};
@@ -8,4 +8,15 @@ for(const invalid of [null,{...program,execute:true},{name:'x',steps:[null]},{na
 assert.deepEqual(pcb2Shortcut({code:'KeyK',ctrlKey:true,shiftKey:true,altKey:false,metaKey:false}),{code:14,modifiers:[true,true,false,false]});
 assert.equal(pcb2Shortcut({code:'F24'}).code,115);assert.equal(pcb2Shortcut({code:'Numpad0'}).code,98);
 assert.equal(pcb2Shortcut({code:'KeyA',isComposing:true}),null);assert.equal(pcb2Shortcut({code:'KeyA',repeat:true}),null);
+let captured=[];
+for(const event of [{code:'ControlLeft',ctrlKey:true},{code:'ShiftLeft',ctrlKey:true,shiftKey:true},{code:'KeyA',ctrlKey:true,shiftKey:true},{code:'KeyB',ctrlKey:true,shiftKey:true},{code:'KeyA'},{code:'KeyB',repeat:true}])captured=pcb2AppendCaptured(captured,event);
+assert.deepEqual(captured,['CTRL','SHIFT','A','B']);
+assert.deepEqual(pcb2AppendCaptured([],{code:'KeyC',ctrlKey:true}),['CTRL','C']);
+assert.deepEqual(pcb2AppendCaptured(['RCTRL'],{code:'KeyA',ctrlKey:true}),['RCTRL','A']);
+assert.equal(pcb2CapturedKey({code:'Slash',key:'?',shiftKey:true}),'/');
+assert.equal(pcb2CapturedKey({code:'KeyA',isComposing:true}),null);
+assert.equal(pcb2CapturedKey({code:'Numpad1'}),null);
+assert.deepEqual(pcb2AppendCaptured(['A'],{code:'Escape'}),['A','ESC']);
+const full=Array.from('ABCDEFGHIJKLMNOP');assert.throws(()=>pcb2AppendCaptured(full,{code:'KeyQ'}));assert.equal(full.length,16);
+assert.deepEqual(pcb2AppendCaptured(full,{code:'KeyA'}),full);
 console.log('PASS: Unicode/emoji limits, many-key chords, strict actions, shortcut capture and invalid composition');

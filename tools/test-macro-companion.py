@@ -81,6 +81,7 @@ class Tests(unittest.TestCase):
             def request(method,path,headers=None,body=None):
                 connection=http.client.HTTPConnection('127.0.0.1',port,timeout=2);connection.request(method,path,body,headers or {});response=connection.getresponse();status=response.status;data=response.read();connection.close();return status,data
             self.assertEqual(request('GET','/pcb2/')[0],200)
+            self.assertEqual(request('GET','/pcb2/gsap.min.js')[0],200)
             self.assertEqual(request('GET','/api/state',{'Host':'evil.example'})[0],403)
             self.assertEqual(request('POST','/api/config',{'Origin':'https://evil.example','X-PCB2-Control':'1','Content-Type':'application/json'},'{}')[0],403)
             self.assertEqual(request('POST','/api/config',{},'{}')[0],403);self.assertEqual(device.calls,[])
