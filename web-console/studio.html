@@ -1,31 +1,56 @@
 <!doctype html>
 <html lang="zh-Hant">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#131820"><title>PCB2 · 我的快捷鍵</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./usb-connect.css"><link rel="stylesheet" href="./studio.css"><script src="./gsap.min.js" defer></script><script src="./usb-serial.js" defer></script><script src="./companion.js" defer></script><script src="./usb-connect.js" defer></script><script src="./app.js" defer></script><script src="./studio.js" defer></script></head>
-<body class="studio">
-<header class="topbar"><a class="brand" href="./"><span class="brandmark">P2</span><span>PCB2<span class="brand-sub">我的四鍵工作台</span></span></a><span class="connection" id="connection" role="status"><i></i>等待鍵盤</span></header>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f2f5f8"><title>PCB2 · 我的快捷鍵</title><link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./usb-connect.css"><link rel="stylesheet" href="./studio.css"><script src="./gsap.min.js" defer></script><script src="./usb-serial.js" defer></script><script src="./companion.js" defer></script><script src="./usb-connect.js" defer></script><script src="./app.js" defer></script><script src="./studio.js" defer></script></head>
+<body class="studio" data-connected="false">
+<div class="studio-shell">
+<aside class="studio-sidebar">
+  <div class="brand"><span class="brandmark" aria-hidden="true">P2</span><span>PCB2<span class="brand-sub">鍵盤工作台</span></span></div>
+  <nav class="studio-tabs" role="tablist" aria-label="控制台功能" aria-orientation="vertical">
+    <button id="tab-keys" role="tab" aria-selected="true" aria-controls="page-keys" tabindex="0" data-page="keys"><span class="nav-icon" aria-hidden="true">⌨</span>按鍵設定</button>
+    <button id="tab-effects" role="tab" aria-selected="false" aria-controls="page-effects" tabindex="-1" data-page="effects"><span class="nav-icon" aria-hidden="true">◐</span>燈光與音效</button>
+    <button id="tab-audio" role="tab" aria-selected="false" aria-controls="page-audio" tabindex="-1" data-page="audio"><span class="nav-icon" aria-hidden="true">∿</span>收音與錄音<span id="audio-running" hidden>進行中</span></button>
+  </nav>
+  <div class="sidebar-device"><span class="connection" id="connection" role="status"><i></i>等待鍵盤</span><p>你的設定會保存在鍵盤。</p></div>
+</aside>
 <main>
-  <div class="heading"><div><h1>我的四鍵鍵盤</h1><p class="subtitle" id="page-subtitle">選一顆鍵，直接按下你想用的組合。</p></div></div>
+  <header class="heading"><div><h1 id="page-title">設定你的鍵盤</h1><p class="subtitle" id="page-subtitle">選一顆鍵，把常用操作放進去。</p></div><span class="device-name">PCB2 四鍵鍵盤</span></header>
   {{USB}}
   <div class="offline" id="offline" hidden><strong>等待連接</strong><span>接上 USB 後即可讀取鍵盤設定。</span></div>
-  <div class="demo-banner" id="demo-banner" hidden>介面體驗 · 所有設定與音量都是模擬的，不會控制實體鍵盤。<a href="./">返回 USB 連接</a></div>
-  <nav class="studio-tabs" role="tablist" aria-label="控制台功能"><button id="tab-keys" role="tab" aria-selected="true" aria-controls="page-keys" tabindex="0" data-page="keys">按鍵設定</button><button id="tab-effects" role="tab" aria-selected="false" aria-controls="page-effects" tabindex="-1" data-page="effects">燈光與音效</button><button id="tab-audio" role="tab" aria-selected="false" aria-controls="page-audio" tabindex="-1" data-page="audio">收音與錄音<span id="audio-running" hidden>進行中</span></button></nav>
-  <section id="page-keys" role="tabpanel" aria-labelledby="tab-keys" class="workspace keys-workspace">
-    <div class="key-overview">{{BOARD}}<div class="workflow-note"><span>01 選一顆鍵</span><span>02 設定動作</span><span>03 儲存到鍵盤</span></div><p class="caption">畫面上的按鍵用來選擇設定。要測試鍵盤輸出，請切到目標程式，再按實體鍵。</p></div>
-    <section class="panel editor-panel" aria-labelledby="editor-title"><div class="panel-head"><div><span class="editor-key" id="editor-number">01</span><h2 id="editor-title">設定第 1 顆鍵</h2></div><span id="editor-kind" class="pill">快捷鍵</span></div>
-      <fieldset id="key-fields" class="control-fields"><legend class="sr-only">按鍵動作</legend>
-        <label class="field-label" for="action-kind">按下這顆鍵時</label><select id="action-kind"><option value="shortcut">送出快捷鍵</option><option value="chord">同時按多個鍵</option><option value="text">輸入一段文字</option><option value="macro">執行多步巨集</option></select>
-        <div id="shortcut-editor"><button class="button capture-button" id="capture-shortcut">直接按下快捷鍵</button><p class="caption">例如 Ctrl + Shift + S，或 Mac 的 ⌘ + C。</p><div class="preset-row" aria-label="常用快捷鍵"><button data-preset="copy">複製</button><button data-preset="paste">貼上</button><button data-preset="undo">復原</button><button data-preset="space">空白</button></div>{{MAPPINGS}}</div>
-        <div id="program-editor" hidden><label class="field-label" for="macro-name">動作名稱 <span class="optional">選填</span></label><input id="macro-name" type="text" maxlength="64" placeholder="例如：常用回覆"><div id="macro-steps"></div><div class="add-steps" id="add-steps"><button data-add-step="keys">＋ 按鍵組合</button><button data-add-step="text">＋ 輸入文字</button><button data-add-step="wait">＋ 等待</button></div><p class="caption" id="macro-count"></p><p class="editor-error" id="macro-error" role="status"></p></div>
-      </fieldset>
-      <div class="companion-note" id="companion-note" hidden><strong id="macro-support">文字與巨集需要桌面工具</strong><p id="macro-support-detail">啟動後，會在你正在使用的程式輸入文字或按鍵。中文不用先切換輸入法。</p><p class="caption" id="macro-activity" role="status" hidden></p><a href="https://github.com/terry-eric/pcb2-esp32s3-keypad/blob/main/web-console/COMPANION.md" target="_blank" rel="noopener">取得桌面工具與設定方式 ↗</a></div>
-      <div class="test-keys">{{TEST_KEYS}}</div><p class="caption">「試燈光與聲音」只測試板子效果，不會送出快捷鍵或文字。</p>
-    </section>
+  <div class="demo-banner" id="demo-banner" hidden>你正在體驗介面，這些設定不會送到實體鍵盤。<a href="./">連接我的鍵盤</a></div>
+  <section id="page-keys" role="tabpanel" aria-labelledby="tab-keys">
+    <ol class="setup-progress" aria-label="按鍵設定流程"><li id="flow-connect"><span>1</span>連接鍵盤</li><li id="flow-edit"><span>2</span>設定按鍵</li><li id="flow-save"><span>3</span>儲存變更</li></ol>
+    <div class="workspace keys-workspace">
+      <section class="key-overview" aria-labelledby="key-overview-title"><div class="workspace-heading"><h2 id="key-overview-title">要設定哪一顆？</h2><p>點選下方的按鍵。</p></div>{{BOARD}}<div id="key-selection-summary" class="selection-summary">正在等待你的鍵盤</div><p class="caption">畫面上的按鍵用來選擇設定。要執行動作，請按鍵盤上的實體鍵。</p><div class="connection-placeholder" id="connection-placeholder"><strong>接上鍵盤，就能開始設定。</strong><p>已儲存的動作會自動出現在這裡。</p></div></section>
+      <section class="panel editor-panel" aria-labelledby="editor-title">
+        <div class="panel-head"><div><span class="editor-key" id="editor-number">01</span><h2 id="editor-title">設定第 1 顆鍵</h2></div><span id="editor-kind" class="pill">快捷鍵</span></div>
+        <fieldset id="key-fields" class="control-fields"><legend class="sr-only">按鍵動作</legend>
+          <p class="field-label action-question">按下這顆鍵，要做什麼？</p>
+          <div class="action-choices" role="radiogroup" aria-label="選擇按鍵動作">
+            <button type="button" role="radio" aria-label="送出快捷鍵" aria-checked="true" data-action-kind="shortcut"><span class="action-symbol" aria-hidden="true">Ctrl</span><span><strong>快捷鍵</strong><small>例如複製、貼上或 F13</small></span></button>
+            <button type="button" role="radio" aria-label="同時按多個鍵" aria-checked="false" data-action-kind="chord"><span class="action-symbol" aria-hidden="true">A+B</span><span><strong>多鍵組合</strong><small>一次送出多個按鍵</small></span></button>
+            <button type="button" role="radio" aria-label="輸入一段文字" aria-checked="false" data-action-kind="text"><span class="action-symbol" aria-hidden="true">文</span><span><strong>輸入文字</strong><small>中文、常用回覆與換行</small></span></button>
+            <button type="button" role="radio" aria-label="執行多步巨集" aria-checked="false" data-action-kind="macro"><span class="action-symbol" aria-hidden="true">1→2</span><span><strong>連續動作</strong><small>按鍵、文字、等待依序執行</small></span></button>
+          </div>
+          <label for="action-kind" class="sr-only">按下這顆鍵時</label><select id="action-kind" hidden tabindex="-1"><option value="shortcut">送出快捷鍵</option><option value="chord">同時按多個鍵</option><option value="text">輸入一段文字</option><option value="macro">執行多步巨集</option></select>
+          <div id="shortcut-editor" class="action-editor">
+            <div class="shortcut-preview"><span>這顆鍵會送出</span><strong id="shortcut-preview">F13</strong></div>
+            <button class="button primary capture-button" id="capture-shortcut">按下我要的快捷鍵</button><p class="caption">點上方按鈕，再按你想用的組合，例如 Ctrl + Shift + S。</p>
+            <div class="preset-block"><p class="field-label">或選一個常用操作</p><div class="preset-row" aria-label="常用快捷鍵"><button data-preset="copy">複製</button><button data-preset="paste">貼上</button><button data-preset="undo">復原</button><button data-preset="space">空白</button></div></div>
+            <details class="manual-mapping"><summary>從清單指定按鍵</summary>{{MAPPINGS}}</details>
+          </div>
+          <div id="program-editor" class="action-editor" hidden><div id="macro-steps"></div><div class="add-steps" id="add-steps"><button data-add-step="keys">＋ 按鍵</button><button data-add-step="text">＋ 文字</button><button data-add-step="wait">＋ 等待</button></div><p class="caption" id="macro-count"></p><p class="editor-error" id="macro-error" role="status"></p><div class="program-name"><label class="field-label" for="macro-name">顯示在鍵帽上的名稱 <span class="optional">選填</span></label><input id="macro-name" type="text" maxlength="64" placeholder="例如：複製、開場白、常用回覆"></div></div>
+        </fieldset>
+        <div class="companion-note" id="companion-note" hidden><strong id="macro-support">文字與巨集需要桌面工具</strong><p id="macro-support-detail">啟動後即可把文字與動作輸入到電腦。</p><details class="macro-diagnostics"><summary>執行狀態</summary><p class="caption" id="macro-activity" role="status" hidden></p></details><a href="https://github.com/terry-eric/pcb2-esp32s3-keypad/blob/main/web-console/COMPANION.md" target="_blank" rel="noopener">查看文字與巨集的啟用方式</a></div>
+        <details class="effect-test"><summary>試一下這顆鍵的燈光與聲音</summary><div class="test-keys">{{TEST_KEYS}}</div><p class="caption">這裡只測試燈光與聲音。鍵盤輸出請在目標程式按實體鍵測試。</p></details>
+      </section>
+    </div>
   </section>
   <section id="page-effects" role="tabpanel" aria-labelledby="tab-effects" class="workspace effects-workspace" hidden><fieldset class="control-fields" data-requires-device><legend class="sr-only">燈光設定</legend>{{LIGHT}}</fieldset><fieldset class="control-fields" data-requires-device><legend class="sr-only">音效設定</legend>{{SOUND}}</fieldset></section>
   <section id="page-audio" role="tabpanel" aria-labelledby="tab-audio" class="workspace audio-workspace" hidden><div>{{MIC}}</div><div>{{RECORDING}}</div></section>
-  <div class="save-dock"><div><strong id="save-summary">接上鍵盤即可開始設定</strong><span id="save-state" role="status">尚未讀取裝置</span></div><div class="dock-actions"><button class="button secondary" id="apply">暫時套用</button><button class="button primary" id="save">儲存到鍵盤</button></div><p id="save-help">儲存後，重新插拔鍵盤也會保留設定。</p></div>
-  <details class="device-options"><summary>裝置與進階選項</summary><div class="device-option-actions"><button class="quiet" id="reconnect">重新讀取狀態</button><button class="quiet" id="usb-update" hidden>切換韌體更新模式</button><button class="quiet" id="preview-close" hidden>關閉桌面工具</button></div><p class="caption">更新模式會中斷鍵盤連線，只有準備更新韌體時才使用。</p></details>
-  <footer><span>PCB2 · 四鍵工作台</span><span id="device-address">USB 連接 · 保持原本 Wi-Fi</span></footer>
-</main><div class="toast" id="toast" role="status" hidden></div>
+  <div class="save-dock"><div class="save-copy"><strong id="save-summary">連接鍵盤後即可開始</strong><span id="save-state" role="status">尚未讀取裝置</span></div><div class="dock-actions"><button class="button primary" id="save">儲存到鍵盤</button></div><p id="save-help">儲存後，拔掉再插上也會保留。</p></div>
+  <details class="device-options"><summary>更多裝置選項</summary><div class="device-option-actions"><button class="quiet" id="apply">暫時套用，不保存</button><button class="quiet" id="reconnect">重新讀取狀態</button><button class="quiet" id="usb-update" hidden>切換韌體更新模式</button><button class="quiet" id="preview-close" hidden>關閉桌面工具</button></div><p class="caption">更新模式會中斷鍵盤連線，只有準備更新韌體時才使用。</p></details>
+  <footer><span>PCB2 鍵盤工作台</span><span id="device-address">電腦維持原本 Wi-Fi</span></footer>
+</main>
+</div><div class="toast" id="toast" role="status" hidden></div>
 <dialog id="shortcut-dialog" aria-labelledby="capture-title"><form method="dialog"><button class="dialog-close" aria-label="關閉快捷鍵擷取">×</button></form><h2 id="capture-title">按下你想用的快捷鍵</h2><p id="capture-instructions">按住 Ctrl、Shift、Alt 或 ⌘／Win，再按一個鍵。</p><div id="capture-pad" tabindex="0" role="group" aria-label="按鍵擷取區" aria-describedby="capture-note" hidden>在這裡按鍵，會自動加入組合</div><strong id="capture-value" aria-live="polite">等待你的按鍵…</strong><div id="capture-chips" aria-label="已擷取的按鍵"></div><div id="capture-specials" class="capture-specials" hidden><button id="capture-tab" type="button">加入 Tab</button><button id="capture-esc" type="button">加入 Esc</button></div><p id="capture-note">按 Esc 取消；Esc 本身可在下方選單設定。</p><div class="capture-actions"><button class="button secondary" id="capture-reset" hidden>清除重錄</button><button class="button primary" id="capture-confirm" disabled>使用這個快捷鍵</button></div><p class="caption">部分系統快捷鍵會由電腦攔截，請改用選單設定。</p></dialog>
 </body></html>
