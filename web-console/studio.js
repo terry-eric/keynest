@@ -57,7 +57,8 @@ function pcb2ActionLabel(keys,mac=false){
   const names={CTRL:"Ctrl",RCTRL:"右 Ctrl",SHIFT:"Shift",RSHIFT:"右 Shift",ALT:"Alt",RALT:"右 Alt",META:mac?"⌘":"Win",RMETA:mac?"右 ⌘":"右 Win",SPACE:"空白",ENTER:"Enter",ESC:"Esc",LEFT:"←",RIGHT:"→",UP:"↑",DOWN:"↓"};
   return keys.map(key=>names[key]||key).join(" + ");
 }
-if (typeof module === "object" && module.exports) module.exports = {pcb2Chord, pcb2ValidateProgram, pcb2Shortcut, pcb2CapturedKey, pcb2AppendCaptured, pcb2ActionLabel};
+function pcb2MotionEnabled(preference,reduced){return preference==='full'||preference!=='reduced'&&!reduced;}
+if (typeof module === "object" && module.exports) module.exports = {pcb2Chord, pcb2ValidateProgram, pcb2Shortcut, pcb2CapturedKey, pcb2AppendCaptured, pcb2ActionLabel, pcb2MotionEnabled};
 else {
   const transport = window.PCB2Transport, originalFetch = transport.fetch.bind(transport);
   let stateHandler = null, operationHandler = null;
@@ -77,20 +78,56 @@ else {
     for(let i=0;i<10;i++)extraNames.set(i?88+i:98,`數字鍵盤 ${i}`);
     rows.forEach(row=>{const select=row.querySelector("select");for(const [code,name] of extraNames)if(![...select.options].some(option=>Number(option.value)===code))select.add(new Option(name,code));});
     let selected = 0, latest = null, loaded = demo, loading = false, loadFailed = false, saving = false, savedClick = false, capture = null, captureKey = 0, captureStep = null, capturedKeys = [], pendingOperations = 0;
-    const motionMedia=window.gsap?.matchMedia();let animate=()=>{};
-    motionMedia?.add("(prefers-reduced-motion: no-preference)",context=>{
-      context.add("animate",target=>window.gsap.fromTo(target,{scale:.96,autoAlpha:.55},{scale:1,autoAlpha:1,duration:.18,ease:"power2.out",overwrite:true,clearProps:"transform,opacity,visibility"}));
-      animate=target=>context.animate(target);return()=>{animate=()=>{};};
-    });
-    window.addEventListener("pagehide",()=>motionMedia?.revert(),{once:true});
+    const motion=setupMotion(), animate=target=>motion.reveal('capture-'+target.id,target,{y:12,scale:.95,duration:.36});
+    let previousOnline=null,previousWriting=false,savedTimer;
+    function setupMotion(){
+      const gsap=window.gsap, media=window.matchMedia('(prefers-reduced-motion: reduce)'), contexts=new Map();
+      let preference=null,enabled=false;
+      try{preference=localStorage.getItem('pcb2-motion');}catch{}
+      const visible=targets=>(Array.isArray(targets)?targets:[targets]).filter(node=>node?.isConnected&&node.getClientRects().length);
+      function reset(slot){contexts.get(slot)?.revert();contexts.delete(slot);}
+      function clear(){contexts.forEach(context=>context.revert());contexts.clear();}
+      function play(slot,build){reset(slot);if(enabled&&gsap)contexts.set(slot,gsap.context(build,document.body));}
+      function reveal(slot,targets,{y=22,scale=1,duration=.46,stagger=.06}={}){
+        const nodes=visible(targets);if(!nodes.length){reset(slot);return;}
+        play(slot,()=>gsap.fromTo(nodes,{y,scale,opacity:.18},{y:0,scale:1,opacity:1,duration,stagger,ease:'power3.out',clearProps:'transform,opacity'}));
+      }
+      function key(target){
+        play(target,()=>{
+          gsap.fromTo(target,{scale:.92},{scale:1,duration:.42,ease:'back.out(2)',clearProps:'transform'});
+          gsap.fromTo(target,{boxShadow:'0 0 0 0 rgba(49,94,209,.36)'},{boxShadow:'0 0 0 18px rgba(49,94,209,0)',duration:.52,ease:'power2.out',clearProps:'boxShadow'});
+        });
+      }
+      function page(target){reset('entrance');reset('editor');reveal('page',[...target.querySelectorAll('.key-overview,.editor-panel')].concat(target.id==='page-keys'?[]:[...target.children]),{y:28,duration:.52,stagger:.08});}
+      function entrance(){reveal('entrance',[document.querySelector('.brand'),...tabs,document.querySelector('.heading'),document.querySelector('.usb-panel'),document.querySelector('.setup-progress'),document.querySelector('.key-overview'),document.querySelector('.editor-panel')],{y:20,duration:.58,stagger:.045});}
+      function update(){
+        clear();enabled=!!gsap&&pcb2MotionEnabled(preference,media.matches);
+        document.body.dataset.motion=enabled?'full':'reduced';
+        const button=$('motion-toggle');button.disabled=!gsap;button.setAttribute('aria-pressed',String(enabled));
+        button.textContent=gsap?enabled?'動畫開啟':'動畫關閉':'動畫未載入';
+        button.title=enabled?'關閉介面動畫':'開啟介面動畫';
+      }
+      $('motion-toggle').addEventListener('click',()=>{preference=enabled?'reduced':'full';try{localStorage.setItem('pcb2-motion',preference);}catch{}update();if(enabled)entrance();});
+      media.addEventListener('change',update);
+      window.addEventListener('storage',event=>{if(event.key==='pcb2-motion'){preference=event.newValue;update();}});
+      window.addEventListener('pagehide',clear);
+      window.addEventListener('pageshow',event=>{if(event.persisted){update();entrance();}});
+      document.querySelectorAll('details').forEach(details=>details.addEventListener('toggle',()=>{if(details.open)reveal(details,[...details.children].slice(1),{y:10,duration:.34,stagger:.03});else reset(details);}));
+      $('connection-manage').addEventListener('click',()=>{if(document.querySelector('.usb-panel').dataset.expanded==='true')reveal('connection-options',[$('usb-connect-description'),$('serial-note'),$('desktop-console-help'),document.querySelector('.usb-more')],{y:10,duration:.34});else reset('connection-options');});
+      update();return{reset,reveal,key,page,entrance,saved(){
+        play('saved',()=>gsap.fromTo(document.querySelector('.save-dock'),{boxShadow:'0 0 0 0 rgba(32,123,89,.3)'},{boxShadow:'0 0 0 14px rgba(32,123,89,0)',duration:.65,ease:'power2.out',clearProps:'boxShadow'}));
+      }};
+    }
     let programs = Array.from({length:4},()=>({name:"",steps:[]})), kinds = Array(4).fill("shortcut"); const changed = new Set();
     const ready = ()=>demo || $("connection").classList.contains("online");
     const supported = ()=>demo || latest?.macros?.version === 1;
     function toast(message, error = false) { $("toast").textContent=message; $("toast").classList.toggle("error",error); $("toast").hidden=false; setTimeout(()=>$("toast").hidden=true,5000); }
     function page(name, focus = false) {
+      const previous=tabs.find(tab=>tab.getAttribute('aria-selected')==='true')?.dataset.page;
       tabs.forEach(tab=>{const active=tab.dataset.page===name; tab.setAttribute("aria-selected",String(active));tab.tabIndex=active?0:-1; $(tab.getAttribute("aria-controls")).hidden=!active;if(active&&focus)tab.focus();});
       $("page-subtitle").textContent={keys:"點選一顆鍵，設定它要幫你做什麼。",effects:"調整喜歡的燈光與聲音，再儲存到鍵盤。",audio:"先看收音反應，再開始錄音；不需要 SD 卡。"}[name];
       $("page-title").textContent={keys:"設定你的鍵盤",effects:"調整燈光與音效",audio:"收音與錄音"}[name];
+      if(previous!==name)motion.page($('page-'+name));
     }
     tabs.forEach((tab,i)=>{
       tab.addEventListener("click",()=>page(tab.dataset.page));
@@ -109,6 +146,10 @@ else {
     function status() {
       const online=ready(),writing=saving||pendingOperations>0; $("key-fields").disabled=!online||writing||!loaded&&supported();
       document.body.dataset.connected=String(online);
+      const dock=document.querySelector('.save-dock');dock.dataset.writing=String(writing);
+      if(writing&&!previousWriting)dock.dataset.saved='false';previousWriting=writing;
+      if(previousOnline!==null&&previousOnline!==online){motion.reveal('connection',document.querySelector('.usb-panel'),{y:0,scale:.98,duration:.4});if(online)motion.page($('page-'+tabs.find(tab=>tab.getAttribute('aria-selected')==='true').dataset.page));}
+      previousOnline=online;
       $("connection-placeholder").hidden=online;
       choices.forEach(choice=>{const active=choice.dataset.actionKind===kinds[selected];choice.setAttribute('aria-checked',String(active));choice.tabIndex=active?0:-1;choice.disabled=$("key-fields").disabled;});
       keys.forEach(key=>key.disabled=$("key-fields").disabled);
@@ -136,7 +177,7 @@ else {
     }
     operationHandler=delta=>{pendingOperations=Math.max(0,pendingOperations+delta);status();};
     function mark() { changed.add(selected); status(); }
-    function editor() {
+    function editor(withMotion=false) {
       keys.forEach((key,i)=>key.setAttribute("aria-pressed",String(i===selected)));
       rows.forEach((row,i)=>row.hidden=i!==selected);
       document.querySelectorAll("[data-test-key]").forEach(button=>button.hidden=Number(button.dataset.testKey)!==selected);
@@ -145,15 +186,16 @@ else {
       $("shortcut-editor").hidden=kinds[selected]!=="shortcut"; $("program-editor").hidden=kinds[selected]==="shortcut";
       $("macro-name").value=programs[selected].name; $("add-steps").hidden=kinds[selected]!=="macro";
       renderSteps(); status();
+      if(withMotion){motion.reset('entrance');motion.reset('page');motion.reveal('editor',[document.querySelector('.editor-panel .panel-head'),$('key-fields')],{y:14,duration:.36,stagger:.04});}
     }
-    keys.forEach((key,i)=>key.addEventListener("click",()=>{selected=i;editor();}));
+    keys.forEach((key,i)=>key.addEventListener("click",()=>{if(selected!==i){selected=i;editor(true);}motion.key(key);}));
     $("action-kind").addEventListener("change",()=>{
       const kind=$("action-kind").value; kinds[selected]=kind;
       if(kind==="shortcut")programs[selected]={name:"",steps:[]};
       else if(kind==="text"&&!(programs[selected].steps.length===1&&programs[selected].steps[0].type==="text"))programs[selected].steps=[{type:"text",text:""}];
       else if(kind==="chord"&&!(programs[selected].steps.length===1&&programs[selected].steps[0].type==="keys"))programs[selected].steps=[{type:"keys",keys:["CTRL","C"]}];
       else if(kind==="macro"&&!programs[selected].steps.length)programs[selected].steps=[{type:"keys",keys:["CTRL","C"]},{type:"wait",ms:200}];
-      mark();editor();
+      mark();editor(true);
     });
     choices.forEach((choice,i)=>{
       choice.addEventListener('click',()=>{if(choice.dataset.actionKind===$("action-kind").value)return;$("action-kind").value=choice.dataset.actionKind;$("action-kind").dispatchEvent(new Event('change',{bubbles:true}));});
@@ -162,13 +204,14 @@ else {
     $("macro-name").addEventListener("input",()=>{programs[selected].name=$("macro-name").value;mark();});
     function counts() { $("macro-count").textContent=`${programs[selected].steps.length} / 16 步 · 已使用 ${Math.ceil(new TextEncoder().encode(JSON.stringify(programs[selected])).length/12)}% 內容容量`; }
     function renderSteps() {
+      motion.reset('steps');
       $("macro-steps").replaceChildren(); $("macro-error").textContent="";
       programs[selected].steps.forEach((step,index)=>{
         const card=document.createElement("div");card.className="step-card";
         const head=document.createElement("div");head.className="step-head";const title=document.createElement("strong");title.textContent=`${index+1}. ${ {keys:"按鍵組合",text:"輸入文字",wait:"等待"}[step.type]}`;head.append(title);
         if(kinds[selected]==="macro"){
           const tools=document.createElement("div");tools.className="step-tools";
-          for(const [text,label,move] of [["↑","上移",-1],["↓","下移",1],["×","刪除",0]]){const button=document.createElement("button");button.textContent=text;button.setAttribute("aria-label",`${label}第 ${index+1} 步`);button.disabled=move!==0&&(index+move<0||index+move>=programs[selected].steps.length);button.addEventListener("click",()=>{const steps=programs[selected].steps;if(move)[steps[index],steps[index+move]]=[steps[index+move],steps[index]];else steps.splice(index,1);mark();renderSteps();});tools.append(button);}head.append(tools);
+          for(const [text,label,move] of [["↑","上移",-1],["↓","下移",1],["×","刪除",0]]){const button=document.createElement("button");button.textContent=text;button.setAttribute("aria-label",`${label}第 ${index+1} 步`);button.disabled=move!==0&&(index+move<0||index+move>=programs[selected].steps.length);button.addEventListener("click",()=>{const steps=programs[selected].steps;if(move)[steps[index],steps[index+move]]=[steps[index+move],steps[index]];else steps.splice(index,1);mark();renderSteps();motion.reveal('steps',[...$('macro-steps').children],{y:10,duration:.3,stagger:.025});});tools.append(button);}head.append(tools);
         }
         card.append(head);const input=document.createElement(step.type==="text"?"textarea":"input"); input.setAttribute("aria-label",`第 ${index+1} 步${{keys:"組合鍵",text:"文字",wait:"等待毫秒"}[step.type]}`);
         if(step.type==="text"){input.value=step.text;input.placeholder="輸入中文、英文或常用回覆…";}
@@ -180,12 +223,12 @@ else {
         const help=document.createElement("p");help.className="caption";help.textContent=step.type==="keys"?"點「直接按鍵」後，按下要加入的鍵，不必手動輸入名稱；也可在上方修改。":step.type==="text"?"支援中文與換行；每段最多 512 bytes。":"單位為毫秒，1000 = 1 秒。";card.append(help);$("macro-steps").append(card);
       }); counts();
     }
-    document.querySelectorAll("[data-add-step]").forEach(button=>button.addEventListener("click",()=>{if(programs[selected].steps.length>=16){toast("最多 16 個步驟。",true);return;}const type=button.dataset.addStep;programs[selected].steps.push(type==="keys"?{type,keys:["ENTER"]}:type==="text"?{type,text:""}:{type,ms:200});mark();renderSteps();}));
+    document.querySelectorAll("[data-add-step]").forEach(button=>button.addEventListener("click",()=>{if(programs[selected].steps.length>=16){toast("最多 16 個步驟。",true);return;}const type=button.dataset.addStep;programs[selected].steps.push(type==="keys"?{type,keys:["ENTER"]}:type==="text"?{type,text:""}:{type,ms:200});mark();renderSteps();motion.reveal('steps',$('macro-steps').lastElementChild,{y:18,duration:.4});}));
     function setShortcut(shortcut,index) {
       const row=rows[index],select=row.querySelector("select");if(![...select.options].some(option=>Number(option.value)===shortcut.code))select.add(new Option(`HID 0x${shortcut.code.toString(16)}`,shortcut.code));
       select.value=String(shortcut.code);[...row.querySelectorAll("input")].forEach((input,bit)=>input.checked=shortcut.modifiers[bit]);select.dispatchEvent(new Event("change",{bubbles:true}));
     }
-    document.querySelectorAll("[data-preset]").forEach(button=>button.addEventListener("click",()=>{const presets={copy:6,paste:25,undo:29,space:44};setShortcut({code:presets[button.dataset.preset],modifiers:button.dataset.preset==="space"?[false,false,false,false]:[!mac,false,false,mac]},selected);}));
+    document.querySelectorAll("[data-preset]").forEach(button=>button.addEventListener("click",()=>{const presets={copy:6,paste:25,undo:29,space:44};setShortcut({code:presets[button.dataset.preset],modifiers:button.dataset.preset==="space"?[false,false,false,false]:[!mac,false,false,mac]},selected);motion.key(keys[selected]);motion.reveal('shortcut-preview',$('shortcut-preview'),{y:6,scale:.97,duration:.3});}));
     function renderCapture(){
       $("capture-value").textContent=captureStep===null?capture?.label||"等待你的按鍵…":capturedKeys.length?capturedKeys.join(" + "):"按下要加入的鍵…";
       $("capture-confirm").disabled=captureStep===null?!capture:!capturedKeys.length;
@@ -212,7 +255,7 @@ else {
     });
     for(const [id,code] of [["capture-tab","Tab"],["capture-esc","Escape"]])$(id).addEventListener("click",()=>{try{capturedKeys=pcb2AppendCaptured(capturedKeys,{code});renderCapture();$("capture-pad").focus();}catch(error){$("capture-note").textContent=error.message;}});
     $("capture-reset").addEventListener("click",()=>{capturedKeys=[];renderCapture();$("capture-pad").focus();});
-    $("capture-confirm").addEventListener("click",()=>{if(captureStep===null){if(capture)setShortcut(capture,captureKey);}else if(capturedKeys.length){programs[captureKey].steps[captureStep].keys=capturedKeys.slice();changed.add(captureKey);renderSteps();status();}$("shortcut-dialog").close();});
+    $("capture-confirm").addEventListener("click",()=>{if(captureStep===null){if(capture)setShortcut(capture,captureKey);}else if(capturedKeys.length){programs[captureKey].steps[captureStep].keys=capturedKeys.slice();changed.add(captureKey);renderSteps();status();}$("shortcut-dialog").close();motion.key(keys[captureKey]);});
     async function request(path,body) {
       const response=await transport.fetch(path,{method:body?"POST":"GET",headers:body?{"Content-Type":"application/json","X-PCB2-Control":"1"}:{},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(5000)});
       const result=await response.json();if(!response.ok)throw new Error(result.error||"鍵盤沒有接受這次設定。");return result;
@@ -244,9 +287,17 @@ else {
     new MutationObserver(()=>{if(!ready()&&!changed.size){loaded=false;loadFailed=false;}status();}).observe($("connection"),{attributes:true,attributeFilter:["class"]});
     new MutationObserver(()=>status()).observe($("monitor-toggle"),{attributes:true,attributeFilter:["aria-pressed"]});
     new MutationObserver(()=>status()).observe($("record-dot"),{attributes:true,attributeFilter:["class"]});
+    new MutationObserver(()=>{
+      if($('toast').hidden)return;
+      motion.reveal('toast',$('toast'),{y:18,duration:.36});
+      if(!$('toast').classList.contains('error')&&/設定已保存/.test($('toast').textContent)){
+        const dock=document.querySelector('.save-dock');dock.dataset.saved='true';clearTimeout(savedTimer);savedTimer=setTimeout(()=>dock.dataset.saved='false',1300);motion.saved();
+      }
+    }).observe($('toast'),{childList:true,attributes:true,attributeFilter:['hidden','class']});
     // Maintained app updates board labels when loading/saving settings; restore macro summaries.
     new MutationObserver(()=>{if(programs.some(p=>p.steps.length))labelPrograms();}).observe($("board"),{attributes:true,attributeFilter:["class"]});
     document.querySelectorAll("[data-test-key]").forEach(button=>new MutationObserver(()=>{const key=keys[Number(button.dataset.testKey)];key.classList.toggle("down",button.classList.contains("down"));key.classList.toggle("test",button.classList.contains("test"));}).observe(button,{attributes:true,attributeFilter:["class"]}));
     editor();
+    motion.entrance();
   });
 }

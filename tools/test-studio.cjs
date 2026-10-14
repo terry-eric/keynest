@@ -1,5 +1,7 @@
 const assert=require('node:assert/strict');
-const {pcb2Chord,pcb2ValidateProgram,pcb2Shortcut,pcb2CapturedKey,pcb2AppendCaptured,pcb2ActionLabel}=require('../web-console/studio.js');
+const {pcb2Chord,pcb2ValidateProgram,pcb2Shortcut,pcb2CapturedKey,pcb2AppendCaptured,pcb2ActionLabel,pcb2MotionEnabled}=require('../web-console/studio.js');
+assert.equal(pcb2MotionEnabled(null,false),true);assert.equal(pcb2MotionEnabled(null,true),false);
+assert.equal(pcb2MotionEnabled('full',true),true);assert.equal(pcb2MotionEnabled('reduced',false),false);
 assert.deepEqual(pcb2Chord('ctrl + shift + A + B'),['CTRL','SHIFT','A','B']);
 for(const text of ['', 'CTRL +','A + A','EXEC + C',Array.from({length:17},(_,i)=>String.fromCharCode(65+i)).join('+')])assert.throws(()=>pcb2Chord(text));
 const program={name:'常用回覆',steps:[{type:'keys',keys:['META','C']},{type:'wait',ms:200},{type:'text',text:'你好，已收到！\n😀'}]};
@@ -24,4 +26,4 @@ assert.equal(pcb2ActionLabel(['META','C'],true), '複製');
 assert.equal(pcb2ActionLabel(['META','C'],false), 'Win + C');
 assert.equal(pcb2ActionLabel(['CTRL','C'],true), 'Ctrl + C');
 assert.equal(pcb2ActionLabel(['CTRL','SHIFT','C']), 'Ctrl + Shift + C');
-console.log('PASS: Unicode/emoji limits, many-key chords, strict actions, shortcut capture and invalid composition');
+console.log('PASS: Unicode/emoji limits, many-key chords, strict actions, shortcut capture, invalid composition and motion preferences');
