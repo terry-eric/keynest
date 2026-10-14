@@ -8,6 +8,8 @@ ROOT=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser(description=__doc__);parser.add_argument("--version",required=True);args=parser.parse_args()
 manifest=ROOT/"firmware/artifacts/keyboard/manifest.json"
 data=json.loads(manifest.read_text(encoding="utf-8"));data.update(built_at=date.today().isoformat(),version=args.version,validation="Host tests and ESP-IDF build only; this image has not been flashed or hardware-verified.")
+data.pop("physical_validation",None)  # A new build cannot inherit another image's hardware results.
+data.pop("validated",None)
 for artifact in data["files"]:
     path=manifest.parent/artifact["path"]
     if not path.resolve().is_relative_to(manifest.parent.resolve()):raise ValueError("Invalid artifact path")

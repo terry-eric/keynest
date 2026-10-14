@@ -289,7 +289,7 @@
       "sha256": "6360e246649757995ea12921920998d1a7df5ce20f3a2ac846364dbe51c6724c"
     }
   ],
-  "validated": [
+  "v7_historical_validated": [
     "Flash sound upload and CRC",
     "GUI latest recording to sound",
     "Four voice software rendering",
@@ -300,8 +300,31 @@
   "pending": [
     "Intermittent SD capacity / mount / CRC failures",
     "Microphone human speech quality",
-    "SD custom sound persistence"
+    "SD custom sound persistence",
+    "Physical macro keyboard input",
+    "Macro program NVS persistence across restart",
+    "macOS and Linux Unicode input"
   ],
-  "elf": "Same build, debug sections removed for public distribution; all allocated sections verified identical. firmware.bin is the verified original image.",
-  "validation": "Host tests and ESP-IDF build only; this image has not been flashed or hardware-verified."
+  "validated": [
+    "v8 host protocol, Unicode and macro-store tests",
+    "v8 ESP-IDF build",
+    "v8 bootloader and app independent Flash verification",
+    "v8 persistent settings and audio preservation",
+    "v8 runtime macro API and Windows companion connection"
+  ],
+  "elf": "Same build with debug sections removed for public distribution. Flashing and independent verification use firmware.bin; ELF is not flashed.",
+  "validation": "Bootloader and app flashed on one PCB2, independently verified; persistent settings/audio preserved and macro API read. Actual macro keyboard input remains untested.",
+  "physical_validation": {
+    "date": "2026-10-14",
+    "boards": 1,
+    "independent_verify_flash": true,
+    "persistent_settings_and_audio_match": true,
+    "application_settings_restored": true,
+    "runtime_macro_api_version": 1,
+    "macro_programs_read": 4,
+    "psram_bytes": 2097152,
+    "windows_companion_connected": true,
+    "macro_input_tested": false,
+    "macro_persistence_tested": false
+  }
 }
