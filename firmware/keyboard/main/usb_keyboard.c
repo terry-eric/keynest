@@ -1,6 +1,7 @@
 #include "app.h"
 #include "app_api.h"
 #include "macro_store.h"
+#include "macro_engine.h"
 #include "device_control.h"
 #include "tinyusb.h"
 #include "tusb_cdc_acm.h"
@@ -10,43 +11,93 @@
 #include <string.h>
 #include <stdio.h>
 
-static const uint8_t report_descriptor[] = { TUD_HID_REPORT_DESC_KEYBOARD() };
+_Static_assert(sizeof(macro_frame_t)==30,"HID frame must contain 29 keyboard bytes and one consumer byte");
+_Static_assert(CFG_TUD_HID_EP_BUFSIZE>=30,"TinyUSB HID buffer must fit report ID plus NKRO bitmap");
+
+static const uint8_t report_descriptor[] = {
+    // Keyboard report 1: eight modifiers, 224 usage bits (no six-key truncation).
+    0x05,0x01,0x09,0x06,0xa1,0x01,0x85,0x01,
+    0x05,0x07,0x19,0xe0,0x29,0xe7,0x15,0x00,0x25,0x01,0x75,0x01,0x95,0x08,0x81,0x02,
+    0x19,0x00,0x29,0xdf,0x95,0xe0,0x81,0x02,
+    0x05,0x08,0x19,0x01,0x29,0x05,0x95,0x05,0x91,0x02,0x95,0x03,0x91,0x03,0xc0,
+    // Consumer report 2: mute, volume up/down, play/pause, next/previous.
+    0x05,0x0c,0x09,0x01,0xa1,0x01,0x85,0x02,0x15,0x00,0x25,0x01,0x75,0x01,0x95,0x06,
+    0x09,0xe2,0x09,0xe9,0x09,0xea,0x09,0xcd,0x09,0xb5,0x09,0xb6,0x81,0x02,0x95,0x02,0x81,0x03,0xc0
+};
 static const uint8_t configuration[] = {
     TUD_CONFIG_DESCRIPTOR(1, 3, 0, TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_HID_DESC_LEN, 0, 100),
     TUD_CDC_DESCRIPTOR(0, 4, 0x81, 8, 0x02, 0x82, 64),
-    TUD_HID_DESCRIPTOR(2, 5, HID_ITF_PROTOCOL_KEYBOARD, sizeof(report_descriptor), 0x83, 16, 5)
+    TUD_HID_DESCRIPTOR(2, 5, HID_ITF_PROTOCOL_NONE, sizeof(report_descriptor), 0x83, 32, 5)
 };
 static char serial[16];
 static const char *strings[] = {(const char[]){0x09, 0x04}, "PCB2", "PCB2 Keypad", serial, "Keypad log", "Four-key keyboard"};
-static keypad_report_t last_report;
+static macro_frame_t last_report;
 static portMUX_TYPE report_lock = portMUX_INITIALIZER_UNLOCKED;
-static bool last_valid;
-static uint64_t last_sent;
+static uint8_t last_valid;
+static uint8_t leds;
+static macro_engine_t engine;
+static cJSON *running;
+static unsigned running_key, frame_hold;
+static macro_frame_t target;
+static uint64_t frame_at, report_at, started;
+static bool frame_accepted;
+static bool release_pending;
+
+static void finish(const char *result) {
+    if(running){cJSON_Delete(running);running=NULL;macro_store_execution(false,running_key,result);}
+    if(strcmp(result,"completed"))release_pending=true;
+    memset(&target,0,sizeof(target));frame_accepted=false;frame_at=0;frame_hold=30;
+}
 
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t instance) { (void)instance; return report_descriptor; }
 uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t type, uint8_t *buffer, uint16_t length) {
     (void)instance;
-    if (type != HID_REPORT_TYPE_INPUT || report_id || !buffer) return 0;
-    if (length > sizeof(last_report)) length = sizeof(last_report);
-    portENTER_CRITICAL(&report_lock); memcpy(buffer, &last_report, length); portEXIT_CRITICAL(&report_lock);
+    if (type != HID_REPORT_TYPE_INPUT || !buffer || (report_id!=1 && report_id!=2)) return 0;
+    unsigned size=report_id==1?29:1;if(length>size)length=size;
+    portENTER_CRITICAL(&report_lock); memcpy(buffer, report_id==1?(const void*)&last_report:(const void*)&last_report.media, length); portEXIT_CRITICAL(&report_lock);
     return length;
 }
 void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t type, const uint8_t *buffer, uint16_t size) {
-    (void)instance; (void)report_id; (void)type; (void)buffer; (void)size;
+    (void)instance;
+    if(report_id==1 && type==HID_REPORT_TYPE_OUTPUT && buffer && size){portENTER_CRITICAL(&report_lock);leds=buffer[0];portEXIT_CRITICAL(&report_lock);}
 }
 bool usb_keyboard_connected(void) { return tud_mounted(); }
 void usb_keyboard_tick(uint8_t down, const keypad_config_t *config) {
     static uint8_t previous;
-    if (!tud_mounted()) { last_valid = false; previous = down; return; }
+    if (!tud_mounted() || tud_suspended()) { if(running)finish("disconnected");last_valid=false;previous=down;return; }
     uint8_t macros = macro_store_mask(), pressed = down & ~previous;
     previous = down;
-    for (unsigned i = 0; i < 4; ++i) if (pressed & macros & (1U << i)) macro_store_press(i);
-    keypad_report_t report; logic_hid_report(down & ~macros, config, &report);
     uint64_t now = esp_timer_get_time() / 1000;
-    if (last_valid && !memcmp(&report, &last_report, sizeof(report)) && now - last_sent < 500) return;
-    if (tud_hid_ready() && tud_hid_keyboard_report(0, report.modifiers, report.keys)) {
-        portENTER_CRITICAL(&report_lock); last_report = report; portEXIT_CRITICAL(&report_lock);
-        last_valid = true; last_sent = now;
+    uint8_t manual=down & ~macros;
+    bool cancelled=false;
+    if(running && (manual || now-started>180000)){finish(manual?"interrupted":"timeout");cancelled=true;}
+    for(unsigned i=0;i<4;i++)if(pressed & macros & (1U<<i)){
+        if(running || manual || cancelled || release_pending){macro_store_execution(!!running,i,"busy");continue;}
+        cJSON *p=macro_store_get(i);if(!p)continue;
+        const char *error=macro_engine_start(&engine,p);
+        if(error){cJSON_Delete(p);macro_store_execution(false,i,error);continue;}
+        running=p;running_key=i;started=now;frame_accepted=true;frame_at=now;frame_hold=0;
+        macro_store_execution(true,i,"running");
+    }
+    if(running && frame_accepted && now-frame_at>=frame_hold){
+        uint8_t lights;portENTER_CRITICAL(&report_lock);lights=leds;portEXIT_CRITICAL(&report_lock);
+        if(!macro_engine_next(&engine,&target,&frame_hold,!!(lights&2)))finish("completed");
+        frame_accepted=false;report_at=now;
+    }
+    if(!running && !cancelled && !release_pending){
+        keypad_report_t ordinary;logic_hid_report(manual,config,&ordinary);memset(&target,0,sizeof(target));
+        target.modifiers=ordinary.modifiers;for(unsigned i=0;i<6;i++)macro_frame_key(&target,ordinary.keys[i]);
+    }
+    if(running && !frame_accepted && now-report_at>2000){finish("usb_timeout");cancelled=true;}
+    // Each frame's hold begins only after both HID reports are accepted by TinyUSB.
+    if(tud_hid_ready()){
+        if(!(last_valid&1) || memcmp(&target,&last_report,29)){
+            if(tud_hid_report(1,&target,29)){portENTER_CRITICAL(&report_lock);memcpy(&last_report,&target,29);portEXIT_CRITICAL(&report_lock);last_valid|=1;}
+            else return;
+        }else if(!(last_valid&2) || target.media!=last_report.media){
+            if(tud_hid_report(2,&target.media,1)){portENTER_CRITICAL(&report_lock);last_report.media=target.media;portEXIT_CRITICAL(&report_lock);last_valid|=2;}
+            else return;
+        }else if(!frame_accepted){frame_accepted=true;frame_at=now;release_pending=false;}
     }
 }
 static uint32_t cdc_baud=115200;

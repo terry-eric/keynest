@@ -11,11 +11,10 @@
 static SemaphoreHandle_t lock, storage_lock;
 static char programs[4][MACRO_PROGRAM_BYTES + 1];
 static uint8_t enabled;
-static char host[17], pending[MACRO_PROGRAM_BYTES + 1];
-static uint32_t sequence, event_id;
-static unsigned event_key, drops;
-static int64_t host_seen, event_at;
-static bool host_busy;
+static unsigned drops;
+static bool device_busy;
+static unsigned completed, failed, device_key;
+static char device_result[48] = "idle";
 
 bool macro_json_safe(const char *raw, size_t length) {
     unsigned slashes = 0;
@@ -67,8 +66,10 @@ static bool key_name(const char *s) {
     return false;
 }
 bool macro_program_valid(const cJSON *p) {
-    const char *const top[] = {"name","steps"};
-    if (!fields(p, top, 2)) return false;
+    const char *const top[] = {"name","steps"}, *const extended[] = {"name","steps","text_mode"};
+    const cJSON *mode=cJSON_GetObjectItemCaseSensitive(p,"text_mode");
+    if (!fields(p, top, 2) && !fields(p, extended, 3)) return false;
+    if(mode && (!cJSON_IsString(mode) || (strcmp(mode->valuestring,"ascii") && strcmp(mode->valuestring,"linux") && strcmp(mode->valuestring,"macos"))))return false;
     const cJSON *name = cJSON_GetObjectItemCaseSensitive(p, "name"), *steps = cJSON_GetObjectItemCaseSensitive(p, "steps");
     if (!cJSON_IsString(name) || !utf8(name->valuestring, 64) || !cJSON_IsArray(steps) || cJSON_GetArraySize(steps) > MACRO_STEPS) return false;
     unsigned delay = 0;
@@ -97,11 +98,6 @@ bool macro_program_valid(const cJSON *p) {
     char *raw = cJSON_PrintUnformatted(p); if (!raw) return false;
     bool valid = strlen(raw) <= MACRO_PROGRAM_BYTES; free(raw); return valid;
 }
-static bool live(void) { return *host && esp_timer_get_time() - host_seen < 2000000; }
-static void expire(void) {
-    if (!live()) { *host = 0; *pending = 0; host_busy = false; }
-    if (*pending && esp_timer_get_time() - event_at >= 2000000) { *pending = 0; ++drops; }
-}
 esp_err_t macro_store_init(void) {
     lock = xSemaphoreCreateMutex(); storage_lock = xSemaphoreCreateMutex(); if (!lock || !storage_lock) return ESP_ERR_NO_MEM;
     nvs_handle_t handle;
@@ -127,25 +123,27 @@ cJSON *macro_store_get(unsigned key) {
 }
 uint8_t macro_store_mask(void) { xSemaphoreTake(lock, portMAX_DELAY); uint8_t result = enabled; xSemaphoreGive(lock); return result; }
 cJSON *macro_store_status(void) {
-    xSemaphoreTake(lock, portMAX_DELAY); expire();
+    xSemaphoreTake(lock, portMAX_DELAY);
     cJSON *p = cJSON_CreateObject();
-    if (p) { cJSON_AddNumberToObject(p, "version", 1); cJSON_AddNumberToObject(p, "enabled", enabled); cJSON_AddBoolToObject(p, "host_connected", live()); cJSON_AddBoolToObject(p, "busy", host_busy); cJSON_AddNumberToObject(p, "dropped", drops); }
+    if (p) {
+        cJSON_AddNumberToObject(p,"version",1);cJSON_AddStringToObject(p,"execution","device");
+        cJSON_AddNumberToObject(p,"enabled",enabled);cJSON_AddBoolToObject(p,"host_connected",false);
+        cJSON_AddBoolToObject(p,"busy",device_busy);cJSON_AddNumberToObject(p,"dropped",drops);
+        cJSON_AddNumberToObject(p,"completed",completed);cJSON_AddNumberToObject(p,"failed",failed);
+        cJSON_AddNumberToObject(p,"last_key",device_key+1);cJSON_AddStringToObject(p,"result",device_result);
+    }
     xSemaphoreGive(lock); return p;
 }
-void macro_store_press(unsigned key) {
-    if (key >= 4) return;
-    xSemaphoreTake(lock, portMAX_DELAY); expire();
-    if (enabled & (1U << key)) {
-        if (!live() || host_busy || *pending) ++drops;
-        else { memcpy(pending, programs[key], sizeof(pending)); event_key = key; event_id = ++sequence; if (!event_id) event_id = ++sequence; event_at = esp_timer_get_time(); }
-    }
+void macro_store_execution(bool busy,unsigned key,const char *result) {
+    xSemaphoreTake(lock,portMAX_DELAY);device_busy=busy;
+    if(!strcmp(result,"busy"))++drops;
+    else {device_key=key;snprintf(device_result,sizeof(device_result),"%s",result);if(!strcmp(result,"completed"))++completed;
+        else if(!busy && strcmp(result,"idle"))++failed;}
     xSemaphoreGive(lock);
 }
-cJSON *macro_store_event(void) {
-    xSemaphoreTake(lock, portMAX_DELAY); expire(); cJSON *p = cJSON_CreateObject();
-    if (p && *pending) { cJSON_AddNumberToObject(p, "id", event_id); cJSON_AddNumberToObject(p, "key", event_key); cJSON_AddItemToObject(p, "program", cJSON_Parse(pending)); }
-    xSemaphoreGive(lock); return p;
-}
+// Retained protocol endpoints are inert: v10 never delegates physical input to a host.
+void macro_store_press(unsigned key) { (void)key; }
+cJSON *macro_store_event(void) { return cJSON_CreateObject(); }
 esp_err_t macro_store_command(const char *path, cJSON *body) {
     if (!strcmp(path, "/api/macro")) {
         const char *const names[] = {"key","program"}; const cJSON *key = cJSON_GetObjectItemCaseSensitive(body, "key"), *p = cJSON_GetObjectItemCaseSensitive(body, "program");
@@ -157,17 +155,6 @@ esp_err_t macro_store_command(const char *path, cJSON *body) {
         if (err == ESP_OK) { xSemaphoreTake(lock, portMAX_DELAY); unsigned i = (unsigned)key->valuedouble; strcpy(programs[i], raw); if (cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(p, "steps"))) enabled |= 1U << i; else enabled &= ~(1U << i); xSemaphoreGive(lock); }
         xSemaphoreGive(storage_lock); free(raw); return err;
     }
-    const cJSON *token = cJSON_GetObjectItemCaseSensitive(body, "token");
-    if (!cJSON_IsString(token) || strlen(token->valuestring) != 16 || strspn(token->valuestring, "0123456789abcdef") != 16) return ESP_ERR_INVALID_ARG;
-    xSemaphoreTake(lock, portMAX_DELAY); expire(); esp_err_t result = ESP_ERR_INVALID_STATE;
-    if (!strcmp(path, "/api/macro/host")) {
-        const char *const names[] = {"token","busy"}; const cJSON *busy = cJSON_GetObjectItemCaseSensitive(body, "busy");
-        if (!fields(body, names, 2) || !cJSON_IsBool(busy)) result = ESP_ERR_INVALID_ARG;
-        else if (!live() || !strcmp(host, token->valuestring)) { strcpy(host, token->valuestring); host_seen = esp_timer_get_time(); host_busy = cJSON_IsTrue(busy); result = ESP_OK; }
-    } else if (!strcmp(path, "/api/macro/ack")) {
-        const char *const names[] = {"token","id"}; const cJSON *id = cJSON_GetObjectItemCaseSensitive(body, "id");
-        if (!fields(body, names, 2) || !integer(id, UINT32_MAX)) result = ESP_ERR_INVALID_ARG;
-        else if (live() && !strcmp(host, token->valuestring) && *pending && (uint32_t)id->valuedouble == event_id) { *pending = 0; result = ESP_OK; }
-    }
-    xSemaphoreGive(lock); return result;
+    // Old companion tools cannot acquire an execution lease or duplicate device input.
+    return ESP_ERR_INVALID_STATE;
 }

@@ -2,7 +2,7 @@
 
 這個應用使用專案的 `pcb2_board` component，整合 USB HID 鍵盤、四顆 RGB LED、自訂按鍵音、麥克風音量與 WAV 錄音。Web App 直接放在韌體中，由 ESP32-S3 提供；連到裝置 Wi-Fi 即可操作，無需網際網路或 SD 卡。
 
-最新 `keypad-studio-v9` 加入每鍵獨立音檔、平滑混音限制及 10 分鐘瀏覽器／SD 錄音；保留獨立 NVS 文字／多鍵／巨集設定與按下事件。新版工作介面在[公開控制台](https://demo.terry878.org/pcb2/)及[桌面工具](../../web-console/COMPANION.md)，裝置內建 Wi-Fi 頁面仍保留既有音效／收音介面。普通 HID 快捷鍵獨立運作；中文和多步巨集需要工具。v8 已完成一塊實板的燒錄、校驗及巨集 API 讀取，實體輸入尚未測試，詳見 [VALIDATION.md](VALIDATION.md)。
+v10 改為單一[雲端控制台](https://demo.terry878.org/pcb2/)透過 USB 設定板子，不需安裝或啟動本機背景工具。快捷鍵、最多 16 鍵的組合、媒體鍵、英文文字和 16 步巨集由 ESP32-S3 自行執行，設定保存後可關閉網站。中文依系統輸入方式提供 Linux／macOS 選項；Windows 尚無適用所有軟體的免工具中文模式，詳見下方限制。每鍵音效、平滑混音與 10 分鐘錄音沿用 v9。
 
 目前已完成 ESP-IDF 5.5.0 交叉編譯與軟體驗證。2026-10-13 USB 診斷版已燒錄並核對，實測網頁控制、左右 slot 切換、即時 PCM 波形與免 SD 的 WAV 串流；人聲收音品質尚未通過。實機結果見 [VALIDATION.md](VALIDATION.md)。接腳沿用 2026-09-19 EasyEDA 保存快照，詳細對照見 [board library](../README.md)。
 
@@ -239,3 +239,15 @@ python -m http.server 8027 --bind 127.0.0.1 --directory firmware/keyboard/main/w
 ### 麥克風聲道診斷
 
 `POST /api/microphone/channel`：`{"slot":"left"}` 或 `{"slot":"right"}`，HTTP 與 USB 均可用。未知欄位、重複欄位或其他值拒絕；錄音中回覆 409。切換不改 gain、I2S 時鐘、NS4168 輸出或 NVS。`mic_slots` 的 AC dBFS 未乘數位增益，與網頁的 16 kHz／增益後音量不可直接比較。規格書表格與本板訊號不一致，須以實測及腳位檢查判斷，不能只看料號推定。
+
+## v10 免背景工具的文字與巨集
+
+使用公開 HTTPS 網站、桌面版 Chrome／Edge 和 USB 資料線。首次授權 USB 後，網站讀取及保存設定；動作在板子執行，無需 Python、localhost 或常駐輸入工具。瀏覽器仍負責必要的 USB 通訊、畫面及音訊檔案處理，並不是雲端伺服器直接存取電腦的 USB。
+
+原有 `{name,steps}` program 完全保留，新增選填 `text_mode`：`ascii`（預設）、`linux`、`macos`，同樣計入 1200-byte 限制。英文依美式鍵盤配置輸出，需切到對應英文／Unicode 輸入來源。ASCII 字母會參考主機 Caps Lock LED。Linux Unicode 模式送出 Ctrl+Shift+U／十六進位碼／Enter，需目標輸入環境支援；macOS 需先新增並切換 Unicode Hex Input，目前只接受 U+FFFF 以內字元。整段巨集執行前先檢查，未選模式的中文、macOS 模式的 emoji 會整段拒絕，避免執行前半段後才失敗。介面在儲存時也提示這些限制，原有中文內容仍可讀取。
+
+Windows 未提供在所有軟體通用的免工具中文字串輸入方法；本版不以 Alt+X 或需要登錄檔變更的按法假裝通用支援。參考：[Unicode 官方 FAQ](https://www.unicode.org/faq/font_keyboard.html)、[Ubuntu 字元輸入](https://help.ubuntu.com/stable/ubuntu-help/tips-specialchars.html.en)、[Microsoft HexToUnicode IME](https://learn.microsoft.com/en-us/windows/win32/intl/hextounicode-ime)。Linux／macOS 系統輸入模式目前只有主機邏輯測試，尚未三平台實測。
+
+HID 使用 report 1：8 個修飾鍵與 224-bit NKRO bitmap；report 2：6 個媒體鍵位元，同時組合最多 16 鍵不再截為 6 鍵。改為 report protocol，沒有 BIOS／UEFI boot-keyboard 相容承諾。步驟按下與放開各至少 30ms，只有 TinyUSB 接受 keyboard／consumer report 後才開始計時。按住實體鍵不重複觸發；每次執行使用獨立 program snapshot。一次執行一個巨集，忙碌時其他巨集按下會略過並計數，不排隊；普通實體按鍵中止當前巨集，避免修飾鍵混入文字。USB 斷線／暫停、2 秒無法提交 HID 或執行超過 180 秒時取消，不在重連後補送。
+
+`/api/state.macros` 保留 version 1 與 enabled，新增 `execution:"device"`、busy、completed、failed、dropped、last_key、result。舊 host／ack lease API 回覆 invalid state，event API 無事件，避免舊背景程式重複輸入。網頁 `/api/trigger` 仍然只測試 LED／音效，不能遠端觸發電腦輸入。NVS namespace、設定 blob、Flash 錄音、每鍵音效與 v9 分割表不變；從 v9 只更新 0x10000 app。

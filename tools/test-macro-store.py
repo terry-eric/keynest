@@ -16,3 +16,6 @@ with tempfile.TemporaryDirectory(prefix="macro-test-",dir=ROOT/".tools") as fold
     binary=temp/"test.exe"
     command=[str(TCC),'-DCJSON_HIDE_SYMBOLS','-D__cdecl=','-D__stdcall=','-I'+str(temp),'-I'+str(CJSON),'-I'+str(ROOT/"firmware/keyboard/main"),str(ROOT/"tools/test-macro-store.c"),str(ROOT/"firmware/keyboard/main/macro_store.c"),str(CJSON/"cJSON.c"),'-o',str(binary)]
     subprocess.run(command,check=True);subprocess.run([str(binary)],check=True)
+
+    engine_command=[str(TCC),'-DCJSON_HIDE_SYMBOLS','-D__cdecl=','-D__stdcall=','-I'+str(CJSON),'-I'+str(ROOT/"firmware/keyboard/main"),str(ROOT/"tools/test-macro-engine.c"),str(ROOT/"firmware/keyboard/main/macro_engine.c"),str(CJSON/"cJSON.c"),'-o',str(binary)]
+    subprocess.run(engine_command,check=True);subprocess.run([str(binary)],check=True)

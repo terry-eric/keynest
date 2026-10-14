@@ -7,7 +7,8 @@ function pcb2Chord(value) {
 }
 function pcb2ValidateProgram(program) {
   const fields = (value,names)=>value && Object.keys(value).length===names.length && names.every(name=>Object.hasOwn(value,name));
-  if (!fields(program,["name","steps"]) || typeof program.name !== "string" || new TextEncoder().encode(program.name).length > 64 || !Array.isArray(program.steps) || program.steps.length > 16) throw new Error("名稱最多 64 bytes，巨集最多 16 步。");
+  if ((!fields(program,["name","steps"]) && !fields(program,["name","steps","text_mode"])) || typeof program.name !== "string" || new TextEncoder().encode(program.name).length > 64 || !Array.isArray(program.steps) || program.steps.length > 16) throw new Error("名稱最多 64 bytes，巨集最多 16 步。");
+  if(program.text_mode!==undefined && !["ascii","linux","macos"].includes(program.text_mode))throw new Error("請選擇支援的文字輸入方式。");
   const validString = value => typeof value === "string" && !/[\u0000-\u0008\u000b-\u001f\u007f]/u.test(value) && !/[\ud800-\udfff]/u.test(value);
   if (!validString(program.name)) throw new Error("動作名稱含有無效字元。");
   let delay = 0;
@@ -58,7 +59,13 @@ function pcb2ActionLabel(keys,mac=false){
   return keys.map(key=>names[key]||key).join(" + ");
 }
 function pcb2MotionEnabled(preference,reduced){return preference==='full'||preference!=='reduced'&&!reduced;}
-if (typeof module === "object" && module.exports) module.exports = {pcb2Chord, pcb2ValidateProgram, pcb2Shortcut, pcb2CapturedKey, pcb2AppendCaptured, pcb2ActionLabel, pcb2MotionEnabled};
+function pcb2TextIssue(program){
+  const text=program.steps.filter(step=>step.type==='text').map(step=>step.text).join('');
+  if(/[^\x00-\x7f]/u.test(text)&&(!program.text_mode||program.text_mode==='ascii'))return '這段文字包含中文或其他 Unicode 字元。請先選擇並設定對應的系統輸入方式；Windows 暫無通用的免工具中文模式。';
+  if(program.text_mode==='macos'&&[...text].some(c=>c.codePointAt(0)>0xffff))return 'macOS 模式暫不支援 emoji 等 U+FFFF 以上字元，請移除後再儲存。';
+  return '';
+}
+if (typeof module === "object" && module.exports) module.exports = {pcb2Chord, pcb2ValidateProgram, pcb2Shortcut, pcb2CapturedKey, pcb2AppendCaptured, pcb2ActionLabel, pcb2MotionEnabled, pcb2TextIssue};
 else {
   const transport = window.PCB2Transport, originalFetch = transport.fetch.bind(transport);
   let stateHandler = null, operationHandler = null;
@@ -113,7 +120,7 @@ else {
       window.addEventListener('pagehide',clear);
       window.addEventListener('pageshow',event=>{if(event.persisted){update();entrance();}});
       document.querySelectorAll('details').forEach(details=>details.addEventListener('toggle',()=>{if(details.open)reveal(details,[...details.children].slice(1),{y:10,duration:.34,stagger:.03});else reset(details);}));
-      $('connection-manage').addEventListener('click',()=>{if(document.querySelector('.usb-panel').dataset.expanded==='true')reveal('connection-options',[$('usb-connect-description'),$('serial-note'),$('desktop-console-help'),document.querySelector('.usb-more')],{y:10,duration:.34});else reset('connection-options');});
+      $('connection-manage').addEventListener('click',()=>{if(document.querySelector('.usb-panel').dataset.expanded==='true')reveal('connection-options',[$('usb-connect-description'),$('serial-note'),document.querySelector('.usb-more')],{y:10,duration:.34});else reset('connection-options');});
       update();return{reset,reveal,key,page,entrance,saved(){
         play('saved',()=>gsap.fromTo(document.querySelector('.save-dock'),{boxShadow:'0 0 0 0 rgba(32,123,89,.3)'},{boxShadow:'0 0 0 14px rgba(32,123,89,0)',duration:.65,ease:'power2.out',clearProps:'boxShadow'}));
       }};
@@ -164,18 +171,21 @@ else {
       $("flow-edit").classList.toggle('current',online);$("flow-save").classList.toggle('pending',online&&dirty);
       $("key-selection-summary").textContent=online?`正在編輯第 ${selected+1} 顆鍵${dirty?'，有尚未儲存的設定':''}`:'正在等待你的鍵盤';
       $("save-summary").textContent=!online?"接上鍵盤即可開始設定":writing?"正在儲存，請保持連線…":changed.size?`${changed.size} 顆按鍵有未儲存的動作`:base.includes("尚未套用")?"設定已修改，準備好就儲存":base.includes("尚未保存")?"目前已生效，重啟後還不會保留":"設定已儲存";
-      $("save-help").textContent=changed.size?"文字與巨集會儲存到鍵盤；執行時請保持文字與巨集工具開啟。":"儲存後，重新插拔鍵盤也會保留設定；暫時套用只在這次連接生效。";
-      if(online&&!changed.size&&kinds.some(kind=>kind!=="shortcut")&&!latest?.companion_ready){$("save-help").textContent="動作已保存在鍵盤；執行文字或多鍵動作時，請保持輸入工具開啟。";}
+      $("save-help").textContent=changed.size?"動作會儲存到鍵盤並由板子執行，儲存後可關閉網站。":"儲存後，重新插拔鍵盤也會保留設定；暫時套用只在這次連接生效。";
       $("apply").hidden=changed.size>0;
       document.querySelector(".save-dock").dataset.macroDirty=String(changed.size>0);
       $("save").disabled=$("save").disabled||writing;
+      const onboard=latest?.macros?.execution==="device",hasText=programs[selected].steps.some(step=>step.type==="text");
+      $("text-mode-group").hidden=!hasText;
       $("companion-note").hidden=demo||kinds[selected]==="shortcut";
-      $("companion-note").dataset.ready=String(!!latest?.companion_ready&&!latest?.companion_error);
-      $("macro-support").textContent=!supported()?"這塊板子需要更新巨集韌體":latest?.companion_error?"文字與巨集工具需要檢查":latest?.companion_ready?"文字與巨集工具已就緒":"這個動作需要文字與巨集工具";
-      $("macro-support-detail").textContent=!supported()?"目前韌體仍可設定普通快捷鍵；更新後才能把文字與多步巨集儲存到板子。":latest?.companion_error?latest.companion_error:latest?.companion_ready?"切到目標程式，再按實體鍵即可執行。":"工具會把中文、多鍵組合或連續動作輸入到你目前使用的程式；執行時請保持工具開啟。";
-      const activity=latest?.companion_activity;
-      $("macro-activity").hidden=!online||!activity;
-      if(activity)$("macro-activity").textContent=`已收到 ${activity.received} 次按鍵 · 已執行 ${activity.completed} 次 · 失敗 ${activity.failed} 次`+(activity.last_key?` · 第 ${activity.last_key} 顆鍵：${({running:"執行中",completed:"已送出",failed:"未完成",cancelled:"已中止"})[activity.result]||"等待按鍵"}`:"");
+      $("companion-note").dataset.ready=String(onboard);
+      $("macro-support").textContent=onboard?"由鍵盤自行執行":"請先更新板子韌體";
+      $("macro-support-detail").textContent=onboard?"儲存後，切到目標程式並按實體鍵。網站可以關閉，無須安裝背景工具。":"目前的舊韌體仍需要背景工具。更新為 v10 後，快捷鍵、多鍵組合與巨集就能直接執行。";
+      const activity=latest?.macros,results={running:"執行中",completed:"已送出",interrupted:"其他按鍵中止動作",disconnected:"連線中斷",timeout:"執行逾時",usb_timeout:"USB 未接收輸出",unicode_mode_required:"中文需要先選擇文字輸入方式",macos_bmp_only:"macOS 模式暫不支援 emoji 等擴充字元"};
+      if(onboard&&activity.result&&!["idle","running","completed"].includes(activity.result))$("macro-support-detail").textContent=results[activity.result]||"上次動作未完成，請查看執行狀態。";
+      $("macro-activity").hidden=!online||!onboard;
+      if(onboard)$("macro-activity").textContent=`已送出 ${activity.completed||0} 次 · 未完成 ${activity.failed||0} 次 · 忙碌略過 ${activity.dropped||0} 次`+(results[activity.result]?` · 第 ${activity.last_key} 顆鍵：${results[activity.result]}`:"");
+      if(online&&!onboard&&kinds[selected]!=="shortcut")$("save-help").textContent="設定可保留在板子；更新 v10 韌體後才能免工具執行。";
       $("audio-running").hidden=$("monitor-toggle").getAttribute("aria-pressed")!=="true"&&!$("record-dot").classList.contains("live");
       labelPrograms();
     }
@@ -188,7 +198,7 @@ else {
       $("editor-number").textContent=String(selected+1).padStart(2,"0"); $("editor-title").textContent=`設定第 ${selected+1} 顆鍵`;
       $("action-kind").value=kinds[selected]; $("editor-kind").textContent={shortcut:"快捷鍵",chord:"多鍵組合",text:"輸入文字",macro:"連續動作"}[kinds[selected]];
       $("shortcut-editor").hidden=kinds[selected]!=="shortcut"; $("program-editor").hidden=kinds[selected]==="shortcut";
-      $("macro-name").value=programs[selected].name; $("add-steps").hidden=kinds[selected]!=="macro";
+      $("macro-name").value=programs[selected].name; $("text-mode").value=programs[selected].text_mode||"ascii"; textModeHelp(); $("add-steps").hidden=kinds[selected]!=="macro";
       renderSteps(); status();
       if(withMotion){motion.reset('entrance');motion.reset('page');motion.reveal('editor',[document.querySelector('.editor-panel .panel-head'),$('key-fields')],{y:14,duration:.36,stagger:.04});}
     }
@@ -206,6 +216,10 @@ else {
       choice.addEventListener('keydown',event=>{let next;if(event.key==='ArrowRight'||event.key==='ArrowDown')next=(i+1)%choices.length;else if(event.key==='ArrowLeft'||event.key==='ArrowUp')next=(i+choices.length-1)%choices.length;else return;event.preventDefault();choices[next].focus();choices[next].click();});
     });
     $("macro-name").addEventListener("input",()=>{programs[selected].name=$("macro-name").value;mark();});
+    function textModeHelp(){
+      $("text-mode-help").textContent={ascii:"免設定輸入英文、數字與符號。請使用美式英文鍵盤配置；中文原文可保存，執行前需選擇下方系統模式。Windows 暫無適用所有軟體的免工具中文輸入方式。",linux:"需使用支援 Ctrl + Shift + U 的輸入環境（例如 Ubuntu／GNOME）。請先在目標程式手動確認可輸入 Unicode；部分應用程式不支援。",macos:"需先在 macOS 新增並切換到 Unicode Hex Input 輸入來源。暫支援基本平面中文字；emoji 等 U+FFFF 以上字元會整段拒絕執行。"}[$("text-mode").value];
+    }
+    $("text-mode").addEventListener("change",()=>{programs[selected].text_mode=$("text-mode").value;textModeHelp();mark();});
     function counts() { $("macro-count").textContent=`${programs[selected].steps.length} / 16 步 · 已使用 ${Math.ceil(new TextEncoder().encode(JSON.stringify(programs[selected])).length/12)}% 內容容量`; }
     function renderSteps() {
       motion.reset('steps');
@@ -224,7 +238,7 @@ else {
         input.addEventListener("input",()=>{try{if(step.type==="keys")step.keys=pcb2Chord(input.value);else if(step.type==="text")step.text=input.value;else step.ms=Number(input.value); input.setCustomValidity("");$("macro-error").textContent="";}catch(error){if(step.type==="keys")step.keys=[];input.setCustomValidity(error.message);$("macro-error").textContent=error.message;}mark();counts();});
         card.append(input);
         if(step.type==="keys"){const button=document.createElement("button");button.type="button";button.className="button capture-chord";button.textContent="直接按鍵，幫我組合";button.setAttribute("aria-label",`擷取第 ${index+1} 步的組合鍵`);button.addEventListener("click",()=>openCapture(index));card.append(button);}
-        const help=document.createElement("p");help.className="caption";help.textContent=step.type==="keys"?"點「直接按鍵」後，按下要加入的鍵，不必手動輸入名稱；也可在上方修改。":step.type==="text"?"支援中文與換行；每段最多 512 bytes。":"單位為毫秒，1000 = 1 秒。";card.append(help);$("macro-steps").append(card);
+        const help=document.createElement("p");help.className="caption";help.textContent=step.type==="keys"?"點「直接按鍵」後，按下要加入的鍵，不必手動輸入名稱；也可在上方修改。":step.type==="text"?"每段最多 512 bytes。中文需在「文字輸入方式」選擇適合的系統，並完成系統設定。":"單位為毫秒，1000 = 1 秒。";card.append(help);$("macro-steps").append(card);
       }); counts();
     }
     document.querySelectorAll("[data-add-step]").forEach(button=>button.addEventListener("click",()=>{if(programs[selected].steps.length>=16){toast("最多 16 個步驟。",true);return;}const type=button.dataset.addStep;programs[selected].steps.push(type==="keys"?{type,keys:["ENTER"]}:type==="text"?{type,text:""}:{type,ms:200});mark();renderSteps();motion.reveal('steps',$('macro-steps').lastElementChild,{y:18,duration:.4});}));
@@ -276,7 +290,7 @@ else {
       try {
         if(!supported())throw new Error("目前韌體不支援文字與巨集，請先更新板子。");
         if(!$("key-fields").reportValidity())return;
-        for(const i of changed)pcb2ValidateProgram(programs[i]);
+        for(const i of changed){pcb2ValidateProgram(programs[i]);if(latest?.macros?.execution==='device'){const issue=pcb2TextIssue(programs[i]);if(issue)throw new Error(issue);}}
         saving=true;status();
         if(!demo)for(const i of [...changed]){await request("/api/macro",{key:i,program:programs[i]});changed.delete(i);}
         else changed.clear();
@@ -286,9 +300,9 @@ else {
     $("sound-recording").addEventListener("click",()=>{document.querySelector(".custom-sound").open=true;});
     $("sd-file-sound").addEventListener("click",()=>{page("effects");document.querySelector(".custom-sound").open=true;});
     $("reconnect").addEventListener("click",()=>{if(!changed.size){loaded=false;loadFailed=false;}});
-    for(const id of ["serial-choose","serial-connect","serial-disconnect","desktop-console","tool-console-return"]){$(id).addEventListener("click",event=>{
+    for(const id of ["serial-choose","serial-connect","serial-disconnect"]){$(id).addEventListener("click",event=>{
       const resuming=!ready()&&['serial-choose','serial-connect'].includes(id);
-      if(changed.size&&!resuming||pendingOperations||saving||['desktop-console','tool-console-return'].includes(id)&&(/尚未套用|尚未保存/.test($("save-state").textContent)||$("shortcut-dialog").open)){
+      if(changed.size&&!resuming||pendingOperations||saving){
         event.preventDefault();event.stopImmediatePropagation();toast("先完成擷取並儲存目前的設定，再切換或中斷鍵盤。",true);
       }else if(id!=="serial-disconnect"&&!changed.size){loaded=false;loadFailed=false;}
     },true);}

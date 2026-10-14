@@ -1,6 +1,20 @@
-# PCB2 Keypad v9 公開驗證摘要
+# PCB2 Keypad v10 公開驗證摘要
 
-2026-10-15，`keypad-studio-v9`，ESP-IDF 5.5.0／PlatformIO 6.2.0。本版實機與來源證據綁定 `firmware/artifacts/keyboard/manifest.json` 的 firmware SHA-256；下方 v8／v7 為歷史紀錄。
+2026-10-15，`keypad-studio-v10`，ESP-IDF 5.5.0／PlatformIO 6.2.0。實板 app SHA-256：`e9341d6e3176303b901eaccc1f1cf82eac6206fd8f80fb4236c77c060110222a`。本節只列 v10 本次證據；音訊品質與 10 分鐘錄音的歷史結果見 v9。
+
+- 純公開控制台與板上巨集：正式 Edge 網站 Web Serial 直接連接，不啟動 localhost／Python companion。USB 原已授權，自動連接偏好恢復為啟用，網站不含 localhost 連結或 companion.js；GSAP 動畫保留。畫面顯示「文字與巨集：板上執行」。
+- 使用者在記事本選取測試文字、按第 1 顆實體鍵並 Ctrl+V，確認成功複製貼上。韌體 counter 回報 completed=1、failed=0、dropped=0；原第 1 鍵的 Ctrl+C program 保留。這是 v10 板上 HID 的實際輸入證據，不是舊背景工具。
+- 完整 4 MB 私人 Flash 備份核對原 v9 app／分割表。只更新 0x10000 app；獨立 verify_flash 通過。0x000000–0x00FFFF 的 bootloader／分割表／NVS／PHY 與 0x210000–0x38FFFF 的錄音／全部按鍵音區核對一致。重啟後原 config 與四份 program 完整相同；原始備份、識別碼與音訊未公開。
+- 一次長音訊唯讀校驗因 USB packet transfer stopped 中斷，沒有改寫音訊；後續分成六段讀回，全部與原始備份一致。最終 app、設定區及音訊區另用 verify_flash 的裝置雜湊核對通過。一次重枚舉暫時出現無法開啟的舊 COM 記錄，待 native USB 就緒後唯讀查詢成功；沒有重送任何輸入動作。
+- test-macro-store.py 編譯真實 NVS store 與文字引擎：UTF-8／欄位／長度、NVS 失敗、執行 snapshot、舊 host lease 拒絕、16 鍵位元圖、六種媒體鍵、英文符號／換行、Caps Lock、等待與 Linux／macOS Unicode 序列通過。
+- test-usb-macro.py 編譯真實 USB tick：HID descriptor 長度、初始化、長按不重複、傳輸背壓、兩種 report 放鍵、同時按下略過、斷線不重播、普通按鍵中止、逾時、同鍵中止時持續保留 all-up 報告，全部通過。測試後端是虛擬 HID，未向使用者軟體自動輸入文字。
+- Node：studio 的擷取／UTF-8／中文模式預檢／動畫偏好、連線能力、Web Serial CRC／owner／取消／冪等重送通過。公開網站建置保留原 control IDs，10 個正式 assets／安全標頭／Roomly 與 Trip 六條路由核對通過；USB 14 項與 GPIO 接腳檢查通過。
+- 尚未實板驗證 16 鍵／媒體鍵、英文長文字／多步巨集與 macOS／Linux 系統文字輸入。Windows 免背景工具中文沒有通用支援；Linux 需目標輸入環境支援 Ctrl+Shift+U；macOS 需 Unicode Hex Input，擴充字元／emoji 整段拒絕。沒有聲稱跨平台已通過。
+- v10 不改音訊實作及 v9 分割區；麥克風人聲品質、SD 間歇容量／掛載、USB 音效 CRC、喇叭主觀混音品質及長 SD 錄音／下載仍待確認。
+
+## v9 歷史驗證摘要
+
+2026-10-15，`keypad-studio-v9`，ESP-IDF 5.5.0／PlatformIO 6.2.0。該版產物與驗證紀錄位於 Git commit `1d8e8e3`；當前 manifest 已更新為 v10。
 
 - 完整備份 4 MB Flash，核對 v8 分割表及 app，確認新增音效空間原本全為空白。免按 BOOT 切換成功；只寫 `0x8000` 分割表及 `0x10000` app，獨立 `verify_flash` 通過。NVS／PHY、Flash 錄音、原共用音效及擴充空間在重啟前逐 byte 比對一致。
 - `key_sound` 僅從尾端擴大至 `0x140000`；原共用雙 slot 留在前 `0x40000`，四顆鍵各增加獨立雙 slot。每鍵 CRC、owner／offset 驗證、舊版共用音效相容、重送及 NOR 擦除／PCM／metadata 中途失敗測試通過。

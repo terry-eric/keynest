@@ -12,7 +12,7 @@ USB CDC 使用 115200 baud、DTR true、RTS false。保持 RPC id／protocol、P
 
 實機驗證另記錄使用的瀏覽器、授權選擇／自動重連、實板 state 與音訊結果；協定模擬不能代替這些檢查。保留麥克風與 SD 尚未通過的限制。
 
-## v8 文字與巨集
+## v8／v9 歷史：主機文字與巨集
 
 `macro_store.c` 以獨立 `pcb2_macros` NVS namespace 保存 4 份 UTF-8 program，每份 name／steps，最大 1200 bytes、16 步、每段文字 512 bytes、每個組合 16 鍵。原 keypad settings 結構及所有分割區維持相容。實體鍵按下緣產生事件，網頁 `/api/trigger` 只測燈光與聲音。
 
@@ -21,3 +21,7 @@ USB CDC 使用 115200 baud、DTR true、RTS false。保持 RPC id／protocol、P
 `/api/macro/0..3` 讀取，POST `/api/macro` 保存一鍵 program，host／event／ack API 用於工具。host heartbeat 與事件有效期都是 2 秒；忙碌時丟棄，取走事件後才輸入，不因 USB ACK 不確定重播巨集。維持這些語意，避免重連後輸入過期文字。NVS 只在儲存鍵時寫入，錯誤需顯示，不能自動 erase 或格式化。
 
 適合檢查：`node tools/test-studio.cjs`、`python tools/test-macro-companion.py`、`python tools/test-macro-store.py`、公開建置／Web Serial 測試及 ESP-IDF 編譯。主機輸入用 fake backend，未經明確實機測試安排不要在使用者目前視窗自動打字。
+
+## v10 現行：板上執行
+
+使用單一公開 Web Serial 控制台，不啟動本機 companion。所有實體巨集由 macro_engine.c 與 usb_keyboard.c 執行；host lease API 已停用，避免重複輸入。舊 program 保留，新增選填 text_mode（ascii／linux／macos）；中文須配合系統輸入來源，Windows 尚無通用免工具模式，macOS 暫只支援 BMP。不要假稱跨平台實測通過。詳見 firmware/keyboard/README.md 的 v10 規範。執行 test-macro-store.py、test-usb-macro.py、test-studio.cjs 及連線／Web Serial／公開建置測試。更新 v9 板子只寫 app，完整保存 NVS 與音訊。

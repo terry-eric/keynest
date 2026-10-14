@@ -20,7 +20,8 @@ with tempfile.TemporaryDirectory(prefix="pcb2-web-build-", dir=cache) as tempora
     assert html.index('src="./usb-serial.js"') < html.index('src="./usb-connect.js"') < html.index('src="./app.js"')
     assert 'id="mic-waveform"' in html and 'id="sound-upload"' in html and 'id="serial-choose"' in html
     files = {p.name for p in destination.iterdir()}
-    assert files == {"index.html", "app.js", "style.css", "usb-serial.js", "usb-connect.js", "usb-connect.css", "studio.js", "studio.css", "companion.js", "build-info.json", "gsap.min.js"}
+    assert files == {"index.html", "app.js", "style.css", "usb-serial.js", "usb-connect.js", "usb-connect.css", "studio.js", "studio.css", "build-info.json", "gsap.min.js"}
+    assert "127.0.0.1" not in html and "companion.js" not in html, "Production must use one cloud console"
     import re
     ids=re.findall(r'\bid="([^"]+)"',html)
     assert len(ids)==len(set(ids)), "Duplicate controls break the maintained app"

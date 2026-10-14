@@ -27,15 +27,16 @@ int main(void){
  for(unsigned i=0;i<sizeof(invalid)/sizeof(invalid[0]);i++)assert(!valid(invalid[i]));
  assert(command("/api/macro","{\"key\":0,\"program\":{\"name\":\"hello\",\"steps\":[{\"type\":\"keys\",\"keys\":[\"CTRL\",\"A\",\"B\",\"C\",\"D\",\"E\",\"F\",\"G\"]},{\"type\":\"text\",\"text\":\"你好\"}]}}") == 0);
  assert(macro_store_mask()==1);macro_store_press(0);assert(!pending_id());
- assert(command("/api/macro/host","{\"token\":\"0123456789abcdef\",\"busy\":false}")==0);
- assert(command("/api/macro/host","{\"token\":\"1123456789abcdef\",\"busy\":false}")!=0);
- macro_store_press(0);unsigned id=pending_id();assert(id);macro_store_press(0);assert(pending_id()==id);
- assert(command("/api/macro/ack","{\"token\":\"1123456789abcdef\",\"id\":1}")!=0);assert(pending_id()==id);
- char body[90];snprintf(body,sizeof(body),"{\"token\":\"0123456789abcdef\",\"id\":%u}",id);assert(command("/api/macro/ack",body)==0);assert(!pending_id());assert(command("/api/macro/ack",body)!=0);
- assert(command("/api/macro/host","{\"token\":\"0123456789abcdef\",\"busy\":true}")==0);macro_store_press(0);assert(!pending_id());
- assert(command("/api/macro/host","{\"token\":\"0123456789abcdef\",\"busy\":false}")==0);macro_store_press(0);assert(pending_id());now+=2000001;assert(!pending_id());
- assert(command("/api/macro/host","{\"token\":\"1123456789abcdef\",\"busy\":false}")==0);assert(!pending_id());
+ assert(command("/api/macro/host","{\"token\":\"0123456789abcdef\",\"busy\":false}")!=0);
+ macro_store_press(0);assert(!pending_id());
+ cJSON *snapshot=macro_store_get(0);assert(snapshot);assert(cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(snapshot,"steps"))==2);
+ assert(valid("{\"name\":\"\",\"text_mode\":\"linux\",\"steps\":[]}"));
+ assert(!valid("{\"name\":\"\",\"text_mode\":\"windows\",\"steps\":[]}"));
+ macro_store_execution(true,0,"running");macro_store_execution(true,1,"busy");macro_store_execution(false,0,"completed");
+ cJSON *status=macro_store_status();assert(!strcmp(cJSON_GetObjectItemCaseSensitive(status,"execution")->valuestring,"device"));
+ assert(cJSON_GetObjectItemCaseSensitive(status,"completed")->valueint==1);assert(cJSON_GetObjectItemCaseSensitive(status,"dropped")->valueint==1);cJSON_Delete(status);
  fail_write=1;assert(command("/api/macro","{\"key\":0,\"program\":{\"name\":\"\",\"steps\":[]}}")!=0);assert(macro_store_mask()==1);
  fail_write=0;assert(command("/api/macro","{\"key\":0,\"program\":{\"name\":\"\",\"steps\":[]}}") ==0);assert(macro_store_mask()==0);
- puts("PASS: C Unicode validation, NVS failures, host lease, busy/drop, acknowledgment and expiry without stale replay");return 0;
+ assert(cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(snapshot,"steps"))==2);cJSON_Delete(snapshot);
+ puts("PASS: C Unicode validation, NVS failures, device execution state, independent running snapshot and disabled legacy host input");return 0;
 }
