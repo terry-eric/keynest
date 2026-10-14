@@ -60,6 +60,11 @@ class UsbDevice:
             connection.open()
             connection.dtr = True
             connection.reset_input_buffer()
+        except OSError as error:
+            connection.close()
+            denied = getattr(error, "errno", None) == 13 or getattr(error, "winerror", None) == 5 or "PermissionError(13," in str(error)
+            message = "鍵盤 USB 被其他程式占用。請先在公開網站按「中斷連接」，或關閉串列監控，再回到桌面控制台。" if denied else "無法開啟鍵盤 USB；請確認資料線及裝置連接。"
+            raise DeviceError(503, message) from error
         except Exception:
             connection.close()
             raise

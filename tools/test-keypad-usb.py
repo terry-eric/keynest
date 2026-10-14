@@ -140,6 +140,19 @@ class Tests(unittest.TestCase):
             self.device.json("/api/state")
         self.assertEqual(self.serial.open_states, [])
 
+    def test_occupied_port_reports_handoff_and_can_reconnect(self):
+        original = self.serial.open
+        def denied(): raise OSError("could not open port 'COM_TEST': PermissionError(13, 'Access denied', None, 5)")
+        self.serial.open = denied
+        with self.assertRaises(DeviceError) as caught: self.device.json("/api/state")
+        self.assertEqual(caught.exception.status, 503)
+        self.assertIn("中斷連接",str(caught.exception))
+        self.assertEqual(self.serial.commands, [])
+        self.assertIsNone(self.device.serial)
+        self.serial.open = original
+        self.assertEqual(self.device.json("/api/state"), {"ok":True})
+        self.assertEqual(len(self.serial.commands), 1)
+
     def test_download_releases_session_on_crc_failure(self):
         paths = []
         def reply(request):

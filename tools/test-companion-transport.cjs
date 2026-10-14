@@ -1,0 +1,20 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),vm=require('node:vm');
+let response,networkError=false,changes=0;
+const context=vm.createContext({window:{fetch:async()=>{if(networkError)throw new TypeError('Network failed');return response;}}});
+const Transport=vm.runInContext(fs.readFileSync(require.resolve('../web-console/companion.js'),'utf8')+'\nPCB2CompanionTransport',context);
+(async()=>{
+  const transport=new Transport();transport.onChange=()=>changes++;
+  response=Response.json({recording:{state:1}});
+  await transport.fetch('/api/state');assert.equal(transport.connected,true);assert.equal(transport.busy,true);
+  response=Response.json({error:'USB occupied; release the public website'},{status:503});
+  const failed=await transport.fetch('/api/state');
+  assert.equal(transport.connected,false);assert.equal(transport.busy,false);assert.match(transport.connectionError,/USB occupied/);
+  assert.equal((await failed.json()).error,'USB occupied; release the public website');
+  response=Response.json({recording:{state:0}});
+  await transport.connect();assert.equal(transport.connected,true);assert.equal(transport.connectionError,'');
+  networkError=true;await assert.rejects(transport.fetch('/api/state'));
+  assert.equal(transport.connected,false);assert.equal(transport.busy,false);assert.match(transport.connectionError,/桌面工具/);
+  assert.equal(changes,4);
+  console.log('PASS: occupied USB and unreachable companion clear connection/busy status; recovery clears stale errors');
+})().catch(error=>{console.error(error);process.exitCode=1;});

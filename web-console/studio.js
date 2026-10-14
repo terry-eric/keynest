@@ -84,6 +84,9 @@ else {
       $("companion-note").hidden=kinds[selected]==="shortcut";
       $("macro-support").textContent=!supported()?"這塊板子需要更新巨集韌體":latest?.companion_error?"桌面工具需要檢查":latest?.companion_ready?"桌面工具已就緒":"文字與巨集需要桌面工具";
       $("macro-support-detail").textContent=!supported()?"目前韌體仍可設定普通快捷鍵；更新後才能把文字與多步巨集儲存到板子。":latest?.companion_error?latest.companion_error:latest?.companion_ready?"切到目標程式，再按實體鍵即可執行。忙碌時不會堆積下一次巨集。":"儲存後請啟動桌面工具，並使用它開啟的本機控制台；工具會管理 USB 連線。";
+      const activity=latest?.companion_activity;
+      $("macro-activity").hidden=!online||!activity;
+      if(activity)$("macro-activity").textContent=`已收到 ${activity.received} 次按鍵 · 已執行 ${activity.completed} 次 · 失敗 ${activity.failed} 次`+(activity.last_key?` · 第 ${activity.last_key} 顆鍵：${({running:"執行中",completed:"已送出",failed:"未完成",cancelled:"已中止"})[activity.result]||"等待按鍵"}`:"");
       $("audio-running").hidden=$("monitor-toggle").getAttribute("aria-pressed")!=="true"&&!$("record-dot").classList.contains("live");
       labelPrograms();
     }
@@ -143,6 +146,7 @@ else {
       latest=next;
       if(supported()&&!loaded&&!loading&&!loadFailed){loading=true;void Promise.all([0,1,2,3].map(i=>request(`/api/macro/${i}`))).then(values=>{values.forEach(pcb2ValidateProgram);programs=values;kinds=values.map(p=>!p.steps.length?"shortcut":p.steps.length===1&&p.steps[0].type==="text"?"text":p.steps.length===1&&p.steps[0].type==="keys"?"chord":"macro");loaded=true;editor();}).catch(error=>{loadFailed=true;toast("讀取巨集失敗，請重新連接："+error.message,true);}).finally(()=>loading=false);}
       if(!supported())loaded=true;
+      status();
     };
     $("save").addEventListener("click",async event=>{
       if(savedClick||!changed.size)return;
@@ -160,7 +164,7 @@ else {
     $("sound-recording").addEventListener("click",()=>{document.querySelector(".custom-sound").open=true;});
     $("sd-file-sound").addEventListener("click",()=>{page("effects");document.querySelector(".custom-sound").open=true;});
     $("reconnect").addEventListener("click",()=>{if(!changed.size){loaded=false;loadFailed=false;}});
-    for(const id of ["serial-choose","serial-connect","serial-disconnect"]){$(id).addEventListener("click",event=>{if(changed.size){event.stopImmediatePropagation();toast("先儲存按鍵動作，再切換或中斷鍵盤。",true);}else if(id!=="serial-disconnect"){loaded=false;loadFailed=false;}},true);}
+    for(const id of ["serial-choose","serial-connect","serial-disconnect","desktop-console"]){$(id).addEventListener("click",event=>{if(changed.size){event.preventDefault();event.stopImmediatePropagation();toast("先儲存按鍵動作，再切換或中斷鍵盤。",true);}else if(id!=="serial-disconnect"){loaded=false;loadFailed=false;}},true);}
     new MutationObserver(()=>status()).observe($("save-state"),{childList:true,characterData:true,subtree:true});
     new MutationObserver(()=>{if(!ready()&&!changed.size){loaded=false;loadFailed=false;}status();}).observe($("connection"),{attributes:true,attributeFilter:["class"]});
     new MutationObserver(()=>status()).observe($("monitor-toggle"),{attributes:true,attributeFilter:["aria-pressed"]});

@@ -17,7 +17,7 @@
         <div id="shortcut-editor"><button class="button capture-button" id="capture-shortcut">直接按下快捷鍵</button><p class="caption">例如 Ctrl + Shift + S，或 Mac 的 ⌘ + C。</p><div class="preset-row" aria-label="常用快捷鍵"><button data-preset="copy">複製</button><button data-preset="paste">貼上</button><button data-preset="undo">復原</button><button data-preset="space">空白</button></div>{{MAPPINGS}}</div>
         <div id="program-editor" hidden><label class="field-label" for="macro-name">動作名稱 <span class="optional">選填</span></label><input id="macro-name" type="text" maxlength="64" placeholder="例如：常用回覆"><div id="macro-steps"></div><div class="add-steps" id="add-steps"><button data-add-step="keys">＋ 按鍵組合</button><button data-add-step="text">＋ 輸入文字</button><button data-add-step="wait">＋ 等待</button></div><p class="caption" id="macro-count"></p><p class="editor-error" id="macro-error" role="status"></p></div>
       </fieldset>
-      <div class="companion-note" id="companion-note" hidden><strong id="macro-support">文字與巨集需要桌面工具</strong><p id="macro-support-detail">啟動後，會在你正在使用的程式輸入文字或按鍵。中文不用先切換輸入法。</p><a href="https://github.com/terry-eric/pcb2-esp32s3-keypad/blob/main/web-console/COMPANION.md" target="_blank" rel="noopener">取得桌面工具與設定方式 ↗</a></div>
+      <div class="companion-note" id="companion-note" hidden><strong id="macro-support">文字與巨集需要桌面工具</strong><p id="macro-support-detail">啟動後，會在你正在使用的程式輸入文字或按鍵。中文不用先切換輸入法。</p><p class="caption" id="macro-activity" role="status" hidden></p><a href="https://github.com/terry-eric/pcb2-esp32s3-keypad/blob/main/web-console/COMPANION.md" target="_blank" rel="noopener">取得桌面工具與設定方式 ↗</a></div>
       <div class="test-keys">{{TEST_KEYS}}</div><p class="caption">「試燈光與聲音」只測試板子效果，不會送出快捷鍵或文字。</p>
     </section>
   </section>

@@ -1,5 +1,6 @@
 <section class="panel usb-panel" aria-labelledby="usb-connect-title">
   <div class="usb-intro"><span class="usb-mark">↔</span><div><h2 id="usb-connect-title">先連接你的鍵盤</h2><p id="usb-connect-description">插上 USB 資料線，第一次連接時選擇 PCB2 裝置。</p></div><span class="pill" id="serial-status">尚未連接</span><button class="button primary" id="serial-choose">連接鍵盤</button><a href="?demo=1" id="serial-demo">先體驗介面</a></div>
   <p class="caption" id="serial-note" role="status">電腦維持原本 Wi-Fi。設定與聲音只在電腦和板子間傳送。</p>
+  <p class="caption" id="desktop-console-help">文字與多鍵巨集需由桌面工具執行。<a id="desktop-console" href="http://127.0.0.1:8029/pcb2/?companion=1">釋放 USB 並開啟桌面控制台 ↗</a></p>
   <details class="usb-more"><summary>選擇其他裝置與連線設定</summary><div class="usb-actions"><label class="usb-port-label" for="serial-ports">已授權鍵盤<select id="serial-ports"><option value="">尚無已授權裝置</option></select></label><button class="button secondary" id="serial-connect">連接此裝置</button><button class="quiet" id="serial-disconnect" disabled>中斷連接</button></div><label class="auto-connect"><input id="serial-auto" type="checkbox" checked>下次自動連接這個網站已授權的鍵盤</label></details>
 </section>

@@ -36,9 +36,23 @@ class Tests(unittest.TestCase):
         device=Device();backend=Backend();runner=MacroRunner(device,backend)
         runner.handle({'id':1,'key':0,'program':PROGRAM})
         self.assertEqual([c[0] for c in device.calls],['/api/macro/host','/api/macro/ack','/api/macro/host']);self.assertTrue(backend.events)
+        self.assertEqual(runner.diagnostics(),{'received':1,'completed':1,'failed':0,'last_key':1,'result':'completed'})
         device.fail_ack=True;backend.events.clear()
         with self.assertRaises(DeviceError):runner.handle({'id':2,'key':0,'program':PROGRAM})
         self.assertEqual(backend.events,[]);self.assertFalse(runner.busy.is_set())
+        self.assertEqual(runner.diagnostics()['failed'],1)
+        self.assertEqual(runner.diagnostics()['completed'],1)
+        self.assertNotIn('program',runner.diagnostics())
+    def test_reconnection_clears_usb_error_but_keeps_input_error(self):
+        device=Device();runner=MacroRunner(device,Backend())
+        with patch.object(device,'json',side_effect=DeviceError(503,'USB occupied')):
+            runner.refresh_host()
+        self.assertFalse(runner.ready.is_set());self.assertEqual(runner.error,'USB occupied')
+        runner.refresh_host()
+        self.assertTrue(runner.ready.is_set());self.assertEqual(runner.error,'')
+        runner.input_error='Input denied'
+        runner.refresh_host()
+        self.assertEqual(runner.error,'Input denied')
     def test_cancel_during_wait(self):
         closing=threading.Event();backend=Backend()
         def stop(_):closing.set();return True

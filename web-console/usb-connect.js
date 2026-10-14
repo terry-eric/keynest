@@ -3,19 +3,21 @@
 window.PCB2Transport = new URLSearchParams(location.search).get("companion") === "1" && ["127.0.0.1", "localhost"].includes(location.hostname) ? new PCB2CompanionTransport() : new PCB2SerialTransport();
 document.addEventListener("DOMContentLoaded", () => {
   const $ = id => document.getElementById(id), serial = navigator.serial, demo = new URLSearchParams(location.search).get("demo") === "1";
-  const transport = window.PCB2Transport, companion = transport instanceof PCB2CompanionTransport; let ports = [], working = false;
+  const transport = window.PCB2Transport, companion = transport instanceof PCB2CompanionTransport; let ports = [], working = false, connectionError = "";
+  $("desktop-console-help").hidden = companion || demo;
   $("offline").querySelector("span").textContent = "請使用上方 USB 連接功能。若埠被占用，先關閉 Python 預覽工具或串列監控；此網頁不需要切換 Wi-Fi。";
   $("target-help").textContent = "不用 SD 卡。請保持網頁開啟與 USB 連線，完成後下載 WAV。";
   $("device-address").textContent = "USB 控制台 · 電腦維持原本 Wi-Fi";
   function note(text, error = false) { $("serial-note").textContent = text; $("serial-note").classList.toggle("error", error); }
   function update() {
+    if (transport.connected) connectionError = "";
     const supported = companion || !!serial && window.isSecureContext;
     ["serial-choose", "serial-ports", "serial-auto"].forEach(id => $(id).disabled = !supported || demo || working || transport.busy);
     $("serial-connect").disabled = !supported || demo || working || transport.busy || !ports.length;
     $("serial-disconnect").disabled = !transport.connected || working || transport.busy;
     $("serial-status").textContent = demo ? "介面體驗" : transport.connected ? "已連接" : working ? "連接中…" : "尚未連接";
     $("serial-status").classList.toggle("active", transport.connected);
-    if (transport.connected) note(transport.busy ? "錄音或檔案操作中，完成後可切換裝置。" : "USB 已連接。控制、音訊與錄音直接在這個瀏覽器處理。");
+    if (!demo) note(transport.connectionError || connectionError || (working ? "正在確認 PCB2 USB 裝置…" : transport.connected ? transport.busy ? "錄音或檔案操作中，完成後可切換裝置。" : companion ? "桌面工具已連接鍵盤；文字與巨集會輸入到目前使用的程式。" : "USB 已連接。文字與多鍵巨集請改用下方桌面控制台。" : "尚未連接鍵盤；接上 USB 資料線後再連接。"), !!(transport.connectionError || connectionError));
     $("serial-choose").textContent = transport.connected ? "切換鍵盤" : working ? "正在連接…" : "連接鍵盤";
     $("usb-connect-title").textContent = demo ? "先試試怎麼設定" : transport.connected ? "鍵盤已連接" : "先連接你的鍵盤";
     $("usb-connect-description").textContent = transport.connected ? "選一顆鍵，開始設定常用操作。" : "插上 USB 資料線，第一次連接時選擇 PCB2 裝置。";
@@ -32,9 +34,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   async function connect(port) {
     if (working || transport.busy) return;
-    working = true; note("正在確認 PCB2 USB 裝置…"); update();
+    working = true; connectionError = ""; update();
     try { await transport.connect(port); await refresh(); }
-    catch (error) { note(error.message, true); }
+    catch (error) { connectionError = error.message; note(error.message, true); }
     finally { working = false; update(); }
   }
   $("serial-choose").addEventListener("click", async () => {
@@ -46,6 +48,12 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) { note(error.name === "NotFoundError" ? "已取消選擇。接上板子後可再選一次。" : error.message, error.name !== "NotFoundError"); }
   });
   $("serial-connect").addEventListener("click", () => void connect(ports[Number($("serial-ports").value)]));
+  $("desktop-console").addEventListener("click", async event => {
+    event.preventDefault();
+    if (transport.busy || working) { note("請先完成錄音、下載或音效保存，再開啟桌面控制台。",true); return; }
+    try { if (transport.connected) await transport.disconnect(); location.assign($("desktop-console").href); }
+    catch (error) { note(error.message,true); }
+  });
   $("serial-disconnect").addEventListener("click", async () => {
     if (transport.busy) { note("請先完成錄音、下載或音效保存。", true); return; }
     await transport.disconnect(); note("USB 已中斷，已下載或留在頁面內的音檔仍可使用。");

@@ -21,36 +21,68 @@ class MacroRunner:
         self.device, self.backend = device, backend
         self.closing, self.ready, self.busy = threading.Event(), threading.Event(), threading.Event()
         self.token = secrets.token_hex(8)
-        self.error = ""
+        self.connection_error, self.input_error = "", ""
+        self.activity_lock = threading.Lock()
+        self.activity = {"received":0,"completed":0,"failed":0,"last_key":None,"result":"waiting"}
         self.threads = []
+    @property
+    def error(self):
+        return self.connection_error or self.input_error
+    def diagnostics(self):
+        with self.activity_lock: return dict(self.activity)
+    def refresh_host(self):
+        try:
+            self.device.json("/api/macro/host", {"token":self.token,"busy":self.busy.is_set()})
+            self.connection_error = ""
+            self.ready.set()
+        except (OSError, DeviceError, ValueError) as error:
+            self.ready.clear()
+            self.connection_error = str(error) if isinstance(error,DeviceError) else "鍵盤 USB 連線中斷，請確認資料線及其他程式的連線。"
     def heartbeat(self):
         while not self.closing.is_set():
-            try:
-                self.device.json("/api/macro/host", {"token":self.token,"busy":self.busy.is_set()})
-                self.ready.set()
-            except (OSError, DeviceError, ValueError): self.ready.clear()
+            self.refresh_host()
             self.closing.wait(.4)
     def handle(self, event):
         if not event: return
-        if type(event.get("id")) is not int or not 1 <= event["id"] <= 0xffffffff or type(event.get("key")) is not int or not 0 <= event["key"] < 4: raise ValueError("Invalid event")
+        if not isinstance(event,dict) or type(event.get("id")) is not int or not 1 <= event["id"] <= 0xffffffff or type(event.get("key")) is not int or not 0 <= event["key"] < 4:
+            self.input_error = "收到無效的按鍵事件；未送出輸入。請重新連接鍵盤。"
+            raise ValueError("Invalid event")
         self.busy.set()
+        with self.activity_lock:
+            self.activity.update(received=self.activity["received"]+1,last_key=event["key"]+1,result="running")
+        executing = False
         try:
             self.device.json("/api/macro/host", {"token":self.token,"busy":True})
             # Acknowledge before input: uncertain responses are never replayed into another app.
             self.device.json("/api/macro/ack", {"token":self.token,"id":event["id"]})
-            validate_program(event["program"])
+            validate_program(event.get("program"))
+            executing = True
             execute(event["program"], self.backend, self.closing)
-            self.error = ""
+            self.input_error = ""
+            with self.activity_lock:
+                self.activity.update(completed=self.activity["completed"]+(not self.closing.is_set()),result="cancelled" if self.closing.is_set() else "completed")
+        except (OSError, DeviceError, ValueError, RuntimeError, AttributeError) as error:
+            with self.activity_lock: self.activity.update(failed=self.activity["failed"]+1,result="failed")
+            if executing or isinstance(error,(ValueError,AttributeError)):
+                self.input_error = "巨集未執行或已中止（"+type(error).__name__+"）。請確認目標程式的輸入權限與按鍵設定。"
+            else:
+                self.connection_error = str(error) if isinstance(error,DeviceError) else "鍵盤 USB 中斷，本次巨集未執行；重新連接後請再按實體鍵。"
+                self.ready.clear()
+            raise
         finally:
             self.busy.clear()
             try: self.device.json("/api/macro/host", {"token":self.token,"busy":False})
             except (OSError, DeviceError, ValueError): self.ready.clear()
     def pump(self):
         while not self.closing.is_set():
-            try:
-                if self.ready.is_set(): self.handle(self.device.json("/api/macro/event"))
-            except (OSError, DeviceError, ValueError, RuntimeError, AttributeError) as error:
-                self.error = "巨集未執行或已中止（" + type(error).__name__ + "），請確認桌面輸入權限。"
+            if self.ready.is_set():
+                try: event=self.device.json("/api/macro/event")
+                except (OSError, DeviceError, ValueError) as error:
+                    self.ready.clear()
+                    self.connection_error = str(error) if isinstance(error,DeviceError) else "鍵盤 USB 連線中斷，正在等待重新連接。"
+                else:
+                    try: self.handle(event)
+                    except (OSError, DeviceError, ValueError, RuntimeError, AttributeError): pass
             self.closing.wait(.1)
     def start(self):
         for target in (self.heartbeat, self.pump):
@@ -82,7 +114,7 @@ def make_handler(device, runner, assets, port):
                     return self.reply(200,(assets/name).read_bytes(),{"Content-Type":mimetypes.guess_type(name)[0] or "application/octet-stream"})
                 if self.command=="GET" and path in GETS:
                     if path=="/api/state":
-                        data=device.json(path); data.update(transport="usb",local_preview=False,companion_ready=bool(runner and runner.ready.is_set()),companion_error=runner.error if runner else "桌面輸入尚未啟用")
+                        data=device.json(path); data.update(transport="usb",local_preview=False,companion_ready=bool(runner and runner.ready.is_set()),companion_error=runner.error if runner else "桌面輸入尚未啟用",companion_activity=runner.diagnostics() if runner else None)
                         return self.reply(200,json.dumps(data,ensure_ascii=False).encode(),{"Content-Type":"application/json"})
                     body,headers=device.request(self.path,headers={"X-PCB2-Recording":self.headers.get("X-PCB2-Recording","")});return self.reply(200,body,headers)
                 if self.command=="POST" and path in POSTS:
