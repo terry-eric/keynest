@@ -1,0 +1,4 @@
+interface:
+  display_name: "PCB2 ESP32-S3"
+  short_description: "PCB2 的 ESP-IDF 韌體開發、USB 控制、音訊及硬體診斷"
+  default_prompt: "使用 $pcb2-esp32s3 協助處理這塊板子的韌體、USB Web App 或硬體診斷，先確認目前專案及實板狀態。"

@@ -1,0 +1,13 @@
+{
+  "name": "pcb2-keypad-console",
+  "compatibility_date": "2026-10-14",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist-web",
+    "not_found_handling": "none"
+  },
+  "routes": [
+    {"pattern": "demo.terry878.org/pcb2", "zone_name": "terry878.org"},
+    {"pattern": "demo.terry878.org/pcb2/*", "zone_name": "terry878.org"}
+  ]
+}

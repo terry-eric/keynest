@@ -8,6 +8,8 @@
 - ZTS6672 麥克風即時音量、PCM 波形、直流偏移診斷、數位增益與 WAV 錄音；可選 ICS-43434 建置設定。
 - Web App 可透過 USB 本機工具或裝置 Wi-Fi 控制，不需網際網路或 SD 卡。
 
+公開的 [鍵盤控制台](https://demo.terry878.org/pcb2/) 使用同一套介面，電腦版 Chrome／Edge 可直接選擇 USB 裝置，也可連接已授權裝置，不需 Python 工具。錄音與控制資料在瀏覽器與 PCB 之間傳送；詳見 [網頁 USB 控制台](web-console/README.md)。
+
 | 錄音目的地 | 預設上限 | 保存方式 |
 |---|---:|---|
 | 瀏覽器 | 60 秒 | 下載到手機／電腦 |
@@ -57,6 +59,8 @@ python -m http.server 8027 --bind 127.0.0.1 --directory firmware/keyboard/main/w
 ![Web App 展示](firmware/keyboard/validation/web-desktop.png)
 
 ## 驗證與硬體依據
+
+這塊板子的 Codex skill 位於 [skills/pcb2-esp32s3](skills/pcb2-esp32s3/SKILL.md)，整理接腳、USB／建置／更新流程與已知診斷限制，另提供唯讀產物校驗工具。將整個 `pcb2-esp32s3` 資料夾放到 Codex 的 skills 目錄後，可用 `$pcb2-esp32s3` 呼叫；skill 會從目前工作區定位專案，方便在其他電腦使用。
 
 2026-10-13 已實際燒錄並驗證 USB 控制、即時波形及免 SD 的 WAV 串流。使用者確認麥克風為 ZTS6672；左聲道有資料、右聲道專用建置實測全零，與取得的規格書表格不一致，收音品質尚未通過。診斷與實機驗證狀態見 [驗證紀錄](firmware/keyboard/VALIDATION.md)。接腳依 2026-09-19 EasyEDA 保存快照。
 
