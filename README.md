@@ -8,7 +8,9 @@
 - ZTS6672 麥克風即時音量、PCM 波形、直流偏移診斷、數位增益與 WAV 錄音；可選 ICS-43434 建置設定。
 - Web App 可透過 USB 本機工具或裝置 Wi-Fi 控制，不需網際網路或 SD 卡。
 
-公開的 [鍵盤控制台](https://demo.terry878.org/pcb2/) 使用同一套介面，電腦版 Chrome／Edge 可直接選擇 USB 裝置，也可連接已授權裝置，不需 Python 工具。錄音與控制資料在瀏覽器與 PCB 之間傳送；詳見 [網頁 USB 控制台](web-console/README.md)。
+公開的 [鍵盤控制台](https://demo.terry878.org/pcb2/) 以選鍵、設定動作、儲存為入口，燈光音效與收音錄音分頁操作。電腦版 Chrome／Edge 可直接連接 USB；普通快捷鍵支援按下擷取與常用預設。錄音與控制資料在瀏覽器與 PCB 之間傳送；詳見 [網頁 USB 控制台](web-console/README.md)。
+
+v8 新增多鍵組合、中文文字與 16 步巨集，動作儲存在板子，執行時搭配[桌面工具](web-console/COMPANION.md)。普通快捷鍵不需要工具。新版已編譯和完成主機測試，尚未燒錄或完成 Windows／macOS／Linux 的實機輸入驗證。
 
 | 錄音目的地 | 預設上限 | 保存方式 |
 |---|---:|---|

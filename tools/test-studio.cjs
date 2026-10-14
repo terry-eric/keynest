@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict');
+const {pcb2Chord,pcb2ValidateProgram,pcb2Shortcut}=require('../web-console/studio.js');
+assert.deepEqual(pcb2Chord('ctrl + shift + A + B'),['CTRL','SHIFT','A','B']);
+for(const text of ['', 'CTRL +','A + A','EXEC + C',Array.from({length:17},(_,i)=>String.fromCharCode(65+i)).join('+')])assert.throws(()=>pcb2Chord(text));
+const program={name:'常用回覆',steps:[{type:'keys',keys:['META','C']},{type:'wait',ms:200},{type:'text',text:'你好，已收到！\n😀'}]};
+assert.equal(pcb2ValidateProgram(program),program);
+for(const invalid of [null,{...program,execute:true},{name:'x',steps:[null]},{name:'x',steps:[{type:'text',text:'\u0000'}]},{name:'x',steps:[{type:'text',text:'\ud800'}]},{name:'x',steps:[{type:'text',text:'中'.repeat(171)}]},{name:'x',steps:[{type:'wait',ms:NaN}]},{name:'x',steps:[{type:'wait',ms:true}]},{name:'x',steps:Array(7).fill({type:'wait',ms:5000})},{name:'x',steps:[{type:'keys',keys:['A'],command:'x'}]}])assert.throws(()=>pcb2ValidateProgram(invalid));
+assert.deepEqual(pcb2Shortcut({code:'KeyK',ctrlKey:true,shiftKey:true,altKey:false,metaKey:false}),{code:14,modifiers:[true,true,false,false]});
+assert.equal(pcb2Shortcut({code:'F24'}).code,115);assert.equal(pcb2Shortcut({code:'Numpad0'}).code,98);
+assert.equal(pcb2Shortcut({code:'KeyA',isComposing:true}),null);assert.equal(pcb2Shortcut({code:'KeyA',repeat:true}),null);
+console.log('PASS: Unicode/emoji limits, many-key chords, strict actions, shortcut capture and invalid composition');

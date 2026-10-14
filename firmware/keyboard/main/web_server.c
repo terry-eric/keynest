@@ -4,6 +4,7 @@
 #include "mic_monitor.h"
 #include "key_sound.h"
 #include "device_control.h"
+#include "macro_store.h"
 #include "mbedtls/base64.h"
 #include "pcb2_board.h"
 #include "esp_http_server.h"
@@ -69,6 +70,7 @@ cJSON *app_state_json(void) {
     cJSON_AddNumberToObject(json, "mic_dbfs", state.mic_dbfs); cJSON_AddNumberToObject(json, "mic_peak", state.mic_peak);
     cJSON_AddBoolToObject(json, "mic_preview", true);
     cJSON_AddBoolToObject(json, "usb_auto_download", true);
+    cJSON_AddItemToObject(json, "macros", macro_store_status());
     cJSON_AddNumberToObject(json,"psram_bytes",heap_caps_get_total_size(MALLOC_CAP_SPIRAM));
     cJSON_AddNumberToObject(json,"psram_free_bytes",heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
     cJSON_AddNumberToObject(json,"internal_free_bytes",heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
@@ -144,6 +146,12 @@ static esp_err_t sd_files_get(httpd_req_t *req) {return json_response(req,app_sd
 static esp_err_t state_get(httpd_req_t *req) {
     return json_response(req, app_state_json());
 }
+static esp_err_t macro_get(httpd_req_t *req) {
+    if (!strcmp(req->uri, "/api/macro/event")) return json_response(req, macro_store_event());
+    size_t n = strlen(req->uri);
+    if (n != 12 || req->uri[11] < '0' || req->uri[11] > '3') return json_error(req, "400 Bad Request", "Invalid key");
+    return json_response(req, macro_store_get(req->uri[11] - '0'));
+}
 static bool fields_match(cJSON *root, const char *const *allowed, unsigned count) {
     if (!cJSON_IsObject(root)) return false;
     for (cJSON *item = root->child; item; item = item->next) {
@@ -200,7 +208,7 @@ static cJSON *read_body(httpd_req_t *req) {
         received += result;
     }
     body[received] = 0;
-    cJSON *json = memchr(body, 0, received) ? NULL : cJSON_ParseWithLengthOpts(body, received + 1, NULL, true);
+    cJSON *json = macro_json_safe(body, received) ? cJSON_ParseWithLengthOpts(body, received + 1, NULL, true) : NULL;
     free(body);
     if (!cJSON_IsObject(json)) { cJSON_Delete(json); json_error(req, "400 Bad Request", "Invalid JSON object"); return NULL; }
     return json;
@@ -239,6 +247,12 @@ static esp_err_t sound_command(const char *path,cJSON *body) {
 }
 esp_err_t app_command_execute(const char *path, cJSON *body) {
     esp_err_t result = ESP_ERR_INVALID_ARG;
+    if (!strcmp(path,"/api/macro")) {
+        recorder_status_t rec; recorder_snapshot(&rec);
+        if (rec.state == REC_STARTING || rec.state == REC_ACTIVE || rec.state == REC_STOPPING || rec.downloading) return ESP_ERR_INVALID_STATE;
+        return macro_store_command(path,body);
+    }
+    if (!strncmp(path,"/api/macro/",11)) return macro_store_command(path,body);
     if(!strcmp(path,"/api/device/restart")) {
         const char *const fields[]={"mode"};cJSON *mode=cJSON_GetObjectItemCaseSensitive(body,"mode");
         if(!fields_match(body,fields,1) || !cJSON_IsString(mode) ||
@@ -366,7 +380,7 @@ esp_err_t web_server_start(void) {
     if (err == ESP_OK) err = esp_wifi_set_config(WIFI_IF_AP, &wifi);
     if (err == ESP_OK) err = esp_wifi_start();
     if (err != ESP_OK) return err;
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG(); config.stack_size = 8192; config.max_uri_handlers = 24;
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG(); config.stack_size = 8192; config.max_uri_handlers = 32;
     config.max_open_sockets = 6; config.lru_purge_enable = true; config.recv_wait_timeout = 3; config.send_wait_timeout = 3;
     httpd_handle_t server; err = httpd_start(&server, &config); if (err != ESP_OK) return err;
     const char *assets[] = {"/", "/app.js", "/style.css"};
@@ -376,6 +390,8 @@ esp_err_t web_server_start(void) {
     }
     httpd_uri_t state = {.uri = "/api/state", .method = HTTP_GET, .handler = state_get};
     err = httpd_register_uri_handler(server, &state); if (err != ESP_OK) return err;
+    const char *macro_paths[] = {"/api/macro/0","/api/macro/1","/api/macro/2","/api/macro/3","/api/macro/event"};
+    for (unsigned i = 0; i < 5; ++i) { httpd_uri_t uri = {.uri = macro_paths[i], .method = HTTP_GET, .handler = macro_get}; err = httpd_register_uri_handler(server, &uri); if (err != ESP_OK) return err; }
     httpd_uri_t file = {.uri = "/api/recording.wav", .method = HTTP_GET, .handler = file_get};
     err = httpd_register_uri_handler(server, &file); if (err != ESP_OK) return err;
     httpd_uri_t sd_files={.uri="/api/sd/files",.method=HTTP_GET,.handler=sd_files_get};
@@ -386,7 +402,7 @@ esp_err_t web_server_start(void) {
     err = httpd_register_uri_handler(server, &audio); if (err != ESP_OK) return err;
     httpd_uri_t microphone = {.uri = "/api/microphone", .method = HTTP_GET, .handler = microphone_get};
     err = httpd_register_uri_handler(server, &microphone); if (err != ESP_OK) return err;
-    const char *commands[] = {"/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/microphone/channel", "/api/sound/begin", "/api/sound/chunk", "/api/sound/commit", "/api/sound/cancel", "/api/device/restart"};
+    const char *commands[] = {"/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/microphone/channel", "/api/sound/begin", "/api/sound/chunk", "/api/sound/commit", "/api/sound/cancel", "/api/device/restart", "/api/macro", "/api/macro/host", "/api/macro/ack"};
     for (unsigned i = 0; i < sizeof(commands) / sizeof(commands[0]); ++i) {
         httpd_uri_t uri = {.uri = commands[i], .method = HTTP_POST, .handler = command_post};
         err = httpd_register_uri_handler(server, &uri); if (err != ESP_OK) return err;

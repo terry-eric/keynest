@@ -76,6 +76,11 @@ class Tests(unittest.TestCase):
         self.device.request("/api/config", json.dumps(config).encode())
         self.assertEqual(self.serial.commands, [{"id": 1, "path": "/api/config", "body": config}])
 
+    def test_unicode_macro_fits_the_usb_envelope(self):
+        program={"name":"常用回覆","steps":[{"type":"text","text":"中"*170+"!"}]}
+        self.device.request("/api/macro",json.dumps({"key":0,"program":program},ensure_ascii=False).encode())
+        self.assertEqual(self.serial.commands[-1]["body"]["program"],program)
+
     def test_invalid_json_does_not_become_a_valid_usb_command(self):
         for raw in (b'{"slot":"left","slot":"right"}',
                     b'{"slot":"left","slo\\u0074":"right"}',

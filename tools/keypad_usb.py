@@ -85,7 +85,7 @@ class UsbDevice:
             envelope = {"id": self.sequence, "path": path}
             if body is not None:
                 envelope["body"] = body
-            request = b"PCB2? " + json.dumps(envelope, separators=(",", ":"), allow_nan=False).encode() + b"\n"
+            request = b"PCB2? " + json.dumps(envelope, separators=(",", ":"), allow_nan=False, ensure_ascii=False).encode() + b"\n"
             if len(request) > 1700:
                 raise DeviceError(413, "USB request too large")
             try:

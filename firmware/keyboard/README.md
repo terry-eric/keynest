@@ -2,6 +2,8 @@
 
 這個應用使用專案的 `pcb2_board` component，整合 USB HID 鍵盤、四顆 RGB LED、自訂按鍵音、麥克風音量與 WAV 錄音。Web App 直接放在韌體中，由 ESP32-S3 提供；連到裝置 Wi-Fi 即可操作，無需網際網路或 SD 卡。
 
+最新 `macro-studio-v8` 加入獨立 NVS 文字／多鍵／巨集設定與按下事件。新版工作介面在[公開控制台](https://demo.terry878.org/pcb2/)及[桌面工具](../../web-console/COMPANION.md)，裝置內建 Wi-Fi 頁面仍保留既有音效／收音介面。普通 HID 快捷鍵獨立運作；中文和多步巨集需要工具。v8 尚未燒錄或驗證實際輸入，詳見 [VALIDATION.md](VALIDATION.md)。
+
 目前已完成 ESP-IDF 5.5.0 交叉編譯與軟體驗證。2026-10-13 USB 診斷版已燒錄並核對，實測網頁控制、左右 slot 切換、即時 PCM 波形與免 SD 的 WAV 串流；人聲收音品質尚未通過。實機結果見 [VALIDATION.md](VALIDATION.md)。接腳沿用 2026-09-19 EasyEDA 保存快照，詳細對照見 [board library](../README.md)。
 
 **實際麥克風為 ZTS6672**（使用者於 2026-10-13 確認）。規格書的 CONFIG-open／SELECT-low 表格寫右聲道，但本板右 slot 實測全零；目前預設讀有資料的左 slot，收音品質仍待確認。`menuconfig → PCB2 board` 可選型號及開機聲道，網頁「收音聲道診斷」可在停止錄音後暫時切換，重啟恢復預設。`/api/state` 的 `mic_model` 是建置標示，`mic_slot` 是目前選擇；`mic_slots` 是最近 DMA block 的雙聲道原始統計。

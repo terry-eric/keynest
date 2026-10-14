@@ -1,4 +1,15 @@
-# 公開 USB 控制台驗證
+# 公開 USB 控制台 v2 驗證
+
+2026-10-14 更新：新版按鍵工作流程搭配 `macro-studio-v8`。裝置內的既有 app.js 保持完整；公開／桌面控制台重組面板，原 control IDs 皆保留。
+
+- 按鍵以點鍵選擇、直接擷取快捷鍵、常用動作、單鍵編輯呈現；點選編輯與效果測試分開。燈光音效、收音錄音分頁，收音進行時可從頁籤辨識。原始數值、聲道、SD 檔案及 USB 裝置設定預設收合。
+- 三頁切換、Ctrl+Shift+K 擷取、快捷鍵儲存、中文／emoji／換行、巨集新增及排序，已用瀏覽器操作驗證。以本機模擬裝置確認實際 HTTP program 讀取、保存與重新載入；模擬不會開 USB 或送出系統按鍵。
+- 1180 px 桌面、390 px 窄螢幕已檢查；無水平溢出。保留 Tab／方向鍵頁籤導覽、dialog 的 Esc 取消與明確標籤。
+- Web Serial、原 Web PCM／WAV、自訂聲音裁切／CRC、前端 program 驗證、建置 control IDs／靜態 allowlist 測試通過；新增 C macro store、桌面工具 7 項測試通過。韌體编譯及 4 個產物、64 個來源校驗完成，沒有燒錄。
+- 實板首次授權、巨集事件、NVS 重啟保存與三平台中文輸入尚未測試；公開網站不繞過 USB 授權，文字／多鍵／多步巨集須用桌面工具。Wayland 依賴 compositor virtual-keyboard 支援。
+- 新版已部署到原 `/pcb2/`；正式十個靜態檔案、Web Serial／CSP 標頭逐項核對，排除已知 Cloudflare Analytics 注入後的 HTML 也一致。Roomly、Trip 與 PCB2 六條路由皆已核對。
+
+## 首次部署的歷史紀錄（0f40162）
 
 日期：2026-10-14。網站使用 v7 的原始鍵盤介面，加上瀏覽器 USB transport；既有韌體來源與 4 個建置產物沒有修改，manifest 的 62 個來源檔雜湊仍一致。
 

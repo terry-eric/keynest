@@ -1,5 +1,6 @@
 #include "app.h"
 #include "recorder.h"
+#include "macro_store.h"
 #include "pcb2_board.h"
 #include "nvs.h"
 #include "esp_timer.h"
@@ -27,7 +28,8 @@ esp_err_t app_controller_init(void) {
             state.config = saved;
         nvs_close(handle);
     }
-    return pcb2_board_init();
+    esp_err_t err = macro_store_init();
+    return err == ESP_OK ? pcb2_board_init() : err;
 }
 void app_snapshot(app_snapshot_t *s) {
     xSemaphoreTake(mutex, portMAX_DELAY); *s = state; xSemaphoreGive(mutex);

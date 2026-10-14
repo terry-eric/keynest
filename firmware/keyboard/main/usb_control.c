@@ -2,6 +2,7 @@
 #include "app_api.h"
 #include "mic_monitor.h"
 #include "recorder.h"
+#include "macro_store.h"
 #include "tinyusb.h"
 #include "tusb_cdc_acm.h"
 #include "esp_timer.h"
@@ -64,8 +65,14 @@ static void handle_line(char *line, size_t length) {
     cJSON *id = cJSON_GetObjectItemCaseSensitive(root, "id"), *body = cJSON_GetObjectItemCaseSensitive(root, "body");
     const char *path = cJSON_GetObjectItemCaseSensitive(root, "path")->valuestring;
     cJSON *data = NULL; esp_err_t err = ESP_OK;
-    if (!strcmp(path, "/api/state") && !body) {
+    if (!macro_json_safe(line, length)) {
+        err = ESP_ERR_INVALID_ARG;
+    } else if (!strcmp(path, "/api/state") && !body) {
         data = app_state_json();
+    } else if (!body && strlen(path) == 12 && !strncmp(path,"/api/macro/",11) && path[11] >= '0' && path[11] <= '3') {
+        data = macro_store_get(path[11] - '0');
+    } else if (!body && !strcmp(path,"/api/macro/event")) {
+        data = macro_store_event();
     } else if (!strcmp(path,"/api/sd/files") && !body) {
         data=app_sd_files_json();
     } else if (!strcmp(path, "/api/microphone") && !body) {

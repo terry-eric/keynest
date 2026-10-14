@@ -20,7 +20,14 @@ with tempfile.TemporaryDirectory(prefix="pcb2-web-build-", dir=cache) as tempora
     assert html.index('src="./usb-serial.js"') < html.index('src="./usb-connect.js"') < html.index('src="./app.js"')
     assert 'id="mic-waveform"' in html and 'id="sound-upload"' in html and 'id="serial-choose"' in html
     files = {p.name for p in destination.iterdir()}
-    assert files == {"index.html", "app.js", "style.css", "usb-serial.js", "usb-connect.js", "usb-connect.css", "build-info.json"}
+    assert files == {"index.html", "app.js", "style.css", "usb-serial.js", "usb-connect.js", "usb-connect.css", "studio.js", "studio.css", "companion.js", "build-info.json"}
+    import re
+    ids=re.findall(r'\bid="([^"]+)"',html)
+    assert len(ids)==len(set(ids)), "Duplicate controls break the maintained app"
+    original_html=(root/"firmware/keyboard/main/web/index.html").read_text(encoding="utf-8")
+    assert set(re.findall(r'\bid="([^"]+)"',original_html)).issubset(ids)
+    assert 'id="page-keys"' in html and 'id="page-effects"' in html and 'id="page-audio"' in html
+    assert html.count('data-edit-key=')==4 and html.count('data-trigger=')==4
     assert "serial=(self)" in (Path(temporary) / "_headers").read_text(encoding="utf-8")
     for invalid in ("../outside", "/", "", "pcb2/../outside"):
         try:
@@ -28,4 +35,4 @@ with tempfile.TemporaryDirectory(prefix="pcb2-web-build-", dir=cache) as tempora
             raise AssertionError("Unsafe base path accepted")
         except ValueError:
             pass
-print("PASS: same firmware UI, relative assets, transport order, deployment file allowlist, safe base paths")
+print("PASS: maintained behavior, preserved control IDs, three task pages, edit/test separation, asset allowlist and safe paths")

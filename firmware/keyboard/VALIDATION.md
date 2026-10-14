@@ -1,4 +1,18 @@
-# PCB2 Keypad v7 公開驗證摘要
+# PCB2 Keypad v8 公開驗證摘要
+
+2026-10-14，`macro-studio-v8`：ESP-IDF 5.5.0／PlatformIO 6.2.0 編譯通過，app image 1,095,648 bytes；4 個產物及 64 個來源雜湊見 `firmware/artifacts/keyboard/manifest.json`。這版沒有燒錄或做實板驗證，不能沿用下方 v7 的實機結果當作 v8 通過證據。
+
+- 新增 4 顆鍵的文字／多鍵／巨集 NVS 設定，以獨立 namespace 保存，不修改 v7 設定 blob 或分割區。每顆最多 16 步、每個 chord 最多 16 鍵、文字每段 512 UTF-8 bytes，整段 1200 bytes。
+- 普通快捷鍵維持原 USB HID。巨集鍵不會同時送出舊的 HID 按鍵；只在按下緣產生一次實體事件，由明確啟用的桌面工具執行。網頁效果測試不觸發文字。
+- C 主機測試通過：中文／emoji、欄位與 NUL 驗證、重複鍵拒絕、NVS 寫入失敗時保留原動作、單一 host lease、忙碌／未連接時丟棄、取走確認、逾期事件不補送。桌面工具先 ACK 再輸入，回覆不確定時不重送輸入。
+- 桌面工具 7 項主機測試通過：多鍵與 Unicode 步驟、先驗證整段、ACK 失敗不輸入、等待取消、輸入失敗的按鍵釋放、Wayland 文字 stdin、本機 HTTP 的 Host／Origin／檔案範圍限制。測試使用模擬輸入，沒有對目前電腦送出真實按鍵。
+- USB 13 項既有／新增測試、Web Serial、WAV／PCM、自訂音效裁切／CRC、前端巨集驗證與建置測試通過。GPIO、Quad PSRAM 設定、左麥克風 slot 與固定分割區已核對。
+- 實際板子事件、重啟後 NVS 巨集恢复、Windows／macOS／Linux 中文輸入與權限、實體多鍵輸入尚未測試。Linux Wayland 取決於 virtual-keyboard 協定，不能保證所有桌面環境可用。
+- 麥克風人聲品質、SD 不穩定及 USB 音效 CRC 根因仍未解決。
+
+## v7 實機歷史紀錄
+
+以下記錄屬於 `custom-sound-v7`，保留以供比較。
 
 此文件只包含版本、通用功能測試及尚未完成的項目，不包含原始音訊、裝置識別碼、USB 埠編號或本機工作路徑。
 

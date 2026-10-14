@@ -1,6 +1,6 @@
 # 公開控制台與瀏覽器 USB
 
-`web-console/` 與 `tools/build-web-console.py` 將既有 firmware Web UI 加上 Web Serial transport，產生 `dist-web/pcb2/`。原始 app.js 完整保留，以函式參數傳入 USB fetch adapter，避免公開網站與韌體介面各自分岔。修改來源 UI 後重新建置；不要手動維護 dist 副本。
+`web-console/` 與 `tools/build-web-console.py` 重用 firmware 的功能面板／control IDs 與完整 app.js，產生 `dist-web/pcb2/`。`studio.html`／`studio.css`／`studio.js` 提供三個工作分頁、點鍵編輯、快捷鍵擷取與巨集編輯；原始 app.js 透過函式參數呼叫動態 transport。修改來源後重新建置，不手動維護 dist 副本。
 
 正式網址 `https://demo.terry878.org/pcb2/`，Cloudflare Worker `pcb2-keypad-console` 的 `wrangler.jsonc` 只使用 `/pcb2` 與 `/pcb2/*` 路由；同網域有 Roomly 與 Trip 服務，不要為此任務改它們的路由或覆寫整個網域。
 
@@ -11,3 +11,13 @@ USB CDC 使用 115200 baud、DTR true、RTS false。保持 RPC id／protocol、P
 測試 `node tools/test-web-serial.cjs`、`python tools/test-web-console-build.py` 及相關既有 Web 測試。部署前 `python tools/build-web-console.py`，檢查只含允許的靜態檔案，再以已授權的 Wrangler 部署。不要將整個 repository、skill、韌體備份或錄音當成網站 assets；不要因網站部署而更新 PCB。
 
 實機驗證另記錄使用的瀏覽器、授權選擇／自動重連、實板 state 與音訊結果；協定模擬不能代替這些檢查。保留麥克風與 SD 尚未通過的限制。
+
+## v8 文字與巨集
+
+`macro_store.c` 以獨立 `pcb2_macros` NVS namespace 保存 4 份 UTF-8 program，每份 name／steps，最大 1200 bytes、16 步、每段文字 512 bytes、每個組合 16 鍵。原 keypad settings 結構及所有分割區維持相容。實體鍵按下緣產生事件，網頁 `/api/trigger` 只測燈光與聲音。
+
+普通快捷鍵仍是獨立 HID。所有多鍵／文字／多步巨集透過明確啟用的 `tools/keypad_companion.py` 執行，以支援中文跨作業系統。`python tools/start-companion.py --enable-input` 準備本機環境，控制台網址為 `http://127.0.0.1:8029/pcb2/?companion=1`。桌面工具與 Web Serial 同時只有一方占用 CDC，不另切 Wi-Fi、不使用剪貼簿；Linux Wayland 需要 wtype 和 compositor virtual-keyboard 支援。不要聲稱已在三平台實測。
+
+`/api/macro/0..3` 讀取，POST `/api/macro` 保存一鍵 program，host／event／ack API 用於工具。host heartbeat 與事件有效期都是 2 秒；忙碌時丟棄，取走事件後才輸入，不因 USB ACK 不確定重播巨集。維持這些語意，避免重連後輸入過期文字。NVS 只在儲存鍵時寫入，錯誤需顯示，不能自動 erase 或格式化。
+
+適合檢查：`node tools/test-studio.cjs`、`python tools/test-macro-companion.py`、`python tools/test-macro-store.py`、公開建置／Web Serial 測試及 ESP-IDF 編譯。主機輸入用 fake backend，未經明確實機測試安排不要在使用者目前視窗自動打字。

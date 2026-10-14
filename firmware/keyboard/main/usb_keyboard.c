@@ -1,5 +1,6 @@
 #include "app.h"
 #include "app_api.h"
+#include "macro_store.h"
 #include "device_control.h"
 #include "tinyusb.h"
 #include "tusb_cdc_acm.h"
@@ -35,8 +36,12 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
 }
 bool usb_keyboard_connected(void) { return tud_mounted(); }
 void usb_keyboard_tick(uint8_t down, const keypad_config_t *config) {
-    if (!tud_mounted()) { last_valid = false; return; }
-    keypad_report_t report; logic_hid_report(down, config, &report);
+    static uint8_t previous;
+    if (!tud_mounted()) { last_valid = false; previous = down; return; }
+    uint8_t macros = macro_store_mask(), pressed = down & ~previous;
+    previous = down;
+    for (unsigned i = 0; i < 4; ++i) if (pressed & macros & (1U << i)) macro_store_press(i);
+    keypad_report_t report; logic_hid_report(down & ~macros, config, &report);
     uint64_t now = esp_timer_get_time() / 1000;
     if (last_valid && !memcmp(&report, &last_report, sizeof(report)) && now - last_sent < 500) return;
     if (tud_hid_ready() && tud_hid_keyboard_report(0, report.modifiers, report.keys)) {
