@@ -65,9 +65,11 @@ else {
     function labelPrograms() {
       programs.forEach((p,i)=>{
         const active = kinds[i]!=="shortcut";
+        keys[i].dataset.macro=String(active);
         if (active) { $("key-label-"+i).textContent=p.name||{text:"文字",chord:"組合鍵",macro:"巨集"}[kinds[i]]; $("key-mod-"+i).textContent=kinds[i]==="macro"?`${p.steps.length} 個步驟`:kinds[i]==="text"?"輸入一段文字":"同時送出多鍵"; }
         else { const select=rows[i].querySelector("select"); if(select.selectedOptions.length)$("key-label-"+i).textContent=select.selectedOptions[0].textContent; }
         keys[i].setAttribute("aria-label",`設定第 ${i+1} 顆鍵：${$("key-label-"+i).textContent}`);
+        keys[i].title=keys[i].getAttribute("aria-label");
       });
     }
     function status() {
