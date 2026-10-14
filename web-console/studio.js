@@ -156,19 +156,23 @@ else {
       document.querySelectorAll("[data-requires-device]").forEach(field=>field.disabled=!online||writing);
       const base=$("save-state").textContent;
       const dirty=changed.size>0||base.includes('尚未套用')||base.includes('尚未保存');
+      $('offline-draft').hidden=online||!dirty;
+      $('macro-connection-status').hidden=!online||kinds[selected]==='shortcut';
+      if(!online){$('page-title').textContent='設定你的 PCB2';$('page-subtitle').textContent='連接鍵盤，開始設定你的四顆按鍵。';}
+      else{const active=tabs.find(tab=>tab.getAttribute('aria-selected')==='true').dataset.page;$('page-title').textContent={keys:'設定你的鍵盤',effects:'調整燈光與音效',audio:'收音與錄音'}[active];$('page-subtitle').textContent={keys:'選一顆鍵，把常用操作放進去。',effects:'調整喜歡的燈光與聲音，再儲存到鍵盤。',audio:'看收音反應，選擇保存位置，再開始錄音。'}[active];}
       $("flow-connect").classList.toggle('current',!online);$("flow-connect").classList.toggle('complete',online);
       $("flow-edit").classList.toggle('current',online);$("flow-save").classList.toggle('pending',online&&dirty);
       $("key-selection-summary").textContent=online?`正在編輯第 ${selected+1} 顆鍵${dirty?'，有尚未儲存的設定':''}`:'正在等待你的鍵盤';
       $("save-summary").textContent=!online?"接上鍵盤即可開始設定":writing?"正在儲存，請保持連線…":changed.size?`${changed.size} 顆按鍵有未儲存的動作`:base.includes("尚未套用")?"設定已修改，準備好就儲存":base.includes("尚未保存")?"目前已生效，重啟後還不會保留":"設定已儲存";
-      $("save-help").textContent=changed.size?"文字與巨集會儲存到鍵盤；執行時請保持桌面工具開啟。":"儲存後，重新插拔鍵盤也會保留設定；暫時套用只在這次連接生效。";
-      if(online&&!changed.size&&kinds.some(kind=>kind!=="shortcut")&&!latest?.companion_ready){$("save-help").textContent="文字與多鍵動作已存到板子；切換到桌面控制台後才能執行。";}
+      $("save-help").textContent=changed.size?"文字與巨集會儲存到鍵盤；執行時請保持文字與巨集工具開啟。":"儲存後，重新插拔鍵盤也會保留設定；暫時套用只在這次連接生效。";
+      if(online&&!changed.size&&kinds.some(kind=>kind!=="shortcut")&&!latest?.companion_ready){$("save-help").textContent="動作已保存在鍵盤；執行文字或多鍵動作時，請保持輸入工具開啟。";}
       $("apply").hidden=changed.size>0;
       document.querySelector(".save-dock").dataset.macroDirty=String(changed.size>0);
       $("save").disabled=$("save").disabled||writing;
       $("companion-note").hidden=demo||kinds[selected]==="shortcut";
       $("companion-note").dataset.ready=String(!!latest?.companion_ready&&!latest?.companion_error);
-      $("macro-support").textContent=!supported()?"這塊板子需要更新巨集韌體":latest?.companion_error?"桌面工具需要檢查":latest?.companion_ready?"桌面工具已就緒":"文字與巨集需要桌面工具";
-      $("macro-support-detail").textContent=!supported()?"目前韌體仍可設定普通快捷鍵；更新後才能把文字與多步巨集儲存到板子。":latest?.companion_error?latest.companion_error:latest?.companion_ready?"切到目標程式，再按實體鍵即可執行。忙碌時不會堆積下一次巨集。":"儲存後請啟動桌面工具，並使用它開啟的本機控制台；工具會管理 USB 連線。";
+      $("macro-support").textContent=!supported()?"這塊板子需要更新巨集韌體":latest?.companion_error?"文字與巨集工具需要檢查":latest?.companion_ready?"文字與巨集工具已就緒":"這個動作需要文字與巨集工具";
+      $("macro-support-detail").textContent=!supported()?"目前韌體仍可設定普通快捷鍵；更新後才能把文字與多步巨集儲存到板子。":latest?.companion_error?latest.companion_error:latest?.companion_ready?"切到目標程式，再按實體鍵即可執行。":"工具會把中文、多鍵組合或連續動作輸入到你目前使用的程式；執行時請保持工具開啟。";
       const activity=latest?.companion_activity;
       $("macro-activity").hidden=!online||!activity;
       if(activity)$("macro-activity").textContent=`已收到 ${activity.received} 次按鍵 · 已執行 ${activity.completed} 次 · 失敗 ${activity.failed} 次`+(activity.last_key?` · 第 ${activity.last_key} 顆鍵：${({running:"執行中",completed:"已送出",failed:"未完成",cancelled:"已中止"})[activity.result]||"等待按鍵"}`:"");
@@ -282,11 +286,19 @@ else {
     $("sound-recording").addEventListener("click",()=>{document.querySelector(".custom-sound").open=true;});
     $("sd-file-sound").addEventListener("click",()=>{page("effects");document.querySelector(".custom-sound").open=true;});
     $("reconnect").addEventListener("click",()=>{if(!changed.size){loaded=false;loadFailed=false;}});
-    for(const id of ["serial-choose","serial-connect","serial-disconnect","desktop-console"]){$(id).addEventListener("click",event=>{if(changed.size||pendingOperations||saving||id==="desktop-console"&&(/尚未套用|尚未保存/.test($("save-state").textContent)||$("shortcut-dialog").open)){event.preventDefault();event.stopImmediatePropagation();toast("先完成擷取並儲存目前的設定，再切換或中斷鍵盤。",true);}else if(id!=="serial-disconnect"){loaded=false;loadFailed=false;}},true);}
+    for(const id of ["serial-choose","serial-connect","serial-disconnect","desktop-console","tool-console-return"]){$(id).addEventListener("click",event=>{
+      const resuming=!ready()&&['serial-choose','serial-connect'].includes(id);
+      if(changed.size&&!resuming||pendingOperations||saving||['desktop-console','tool-console-return'].includes(id)&&(/尚未套用|尚未保存/.test($("save-state").textContent)||$("shortcut-dialog").open)){
+        event.preventDefault();event.stopImmediatePropagation();toast("先完成擷取並儲存目前的設定，再切換或中斷鍵盤。",true);
+      }else if(id!=="serial-disconnect"&&!changed.size){loaded=false;loadFailed=false;}
+    },true);}
     new MutationObserver(()=>status()).observe($("save-state"),{childList:true,characterData:true,subtree:true});
     new MutationObserver(()=>{if(!ready()&&!changed.size){loaded=false;loadFailed=false;}status();}).observe($("connection"),{attributes:true,attributeFilter:["class"]});
     new MutationObserver(()=>status()).observe($("monitor-toggle"),{attributes:true,attributeFilter:["aria-pressed"]});
     new MutationObserver(()=>status()).observe($("record-dot"),{attributes:true,attributeFilter:["class"]});
+    function offlineDownload(){const source=$('browser-download'),link=$('offline-download'),available=!!source.getAttribute('href')&&!source.classList.contains('disabled');link.hidden=!available||ready();if(available){link.href=source.href;link.download=source.download;}}
+    new MutationObserver(offlineDownload).observe($('browser-download'),{attributes:true,attributeFilter:['href','class','download']});
+    new MutationObserver(offlineDownload).observe(document.body,{attributes:true,attributeFilter:['data-connected']});
     new MutationObserver(()=>{
       if($('toast').hidden)return;
       motion.reveal('toast',$('toast'),{y:18,duration:.36});

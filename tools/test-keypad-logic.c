@@ -33,10 +33,25 @@ int main(void) {
         if (initial) fprintf(stderr, "Effect %u starts at %d\n", effect, initial);
         assert(initial == 0);
         bool audible = false;
-        for (unsigned i = 0; i < 15000; ++i) { int sample = logic_sound_sample(voices, 100); assert(sample >= -16000 && sample <= 16000); audible |= sample != 0; }
-        assert(audible == (effect != SOUND_OFF)); assert(logic_sound_sample(voices, 100) == 0);
+        keypad_limiter_t limiter={65536};
+        for (unsigned i = 0; i < 15000; ++i) { int sample = logic_limit_sample(&limiter,logic_sound_sample(voices, 100)); assert(sample >= -28000 && sample <= 28000); audible |= sample != 0; }
+        assert(audible == (effect != SOUND_OFF && effect != SOUND_CUSTOM)); assert(logic_sound_sample(voices, 100) == 0);
         logic_voice_start(&voices[0], 0, effect); for (unsigned i = 0; i < 1000; ++i) assert(logic_sound_sample(voices, 0) == 0);
     }
+    keypad_limiter_t limiter={65536};
+    assert(logic_limit_sample(&limiter,12000)==12000); // Quiet signals retain their amplitude.
+    assert(logic_limit_sample(&limiter,120000)>27990); // Four full-scale voices stay bounded.
+    assert(limiter.gain<65536);
+    uint32_t reduced=limiter.gain;
+    for(unsigned i=0;i<1000;++i) {
+        int sample=logic_limit_sample(&limiter,i%2?-131072:131068);
+        assert(sample>=-28000 && sample<=28000);
+    }
+    uint32_t before=limiter.gain;logic_limit_sample(&limiter,12000);
+    assert(limiter.gain>before && limiter.gain-before<30); // No abrupt gain jump when voices end.
+    for(unsigned i=0;i<48000;++i)logic_limit_sample(&limiter,0);
+    assert(limiter.gain==65536);assert(logic_limit_sample(&limiter,12000)==12000);
+    (void)reduced;
     uint8_t rgb[4][3]; uint64_t pulses[4] = {100,0,0,0}; logic_defaults(&c);
     c.led_mode = LED_OFF; logic_led_frame(&c, 150, pulses, 15, 1, rgb); for (unsigned i = 0; i < sizeof(rgb); ++i) assert(((uint8_t *)rgb)[i] == 0);
     c.led_mode = LED_SOLID; logic_led_frame(&c, 150, pulses, 0, 0, rgb); for (unsigned i = 0; i < 4; ++i) assert(!memcmp(rgb[i], c.color, 3));

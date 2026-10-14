@@ -5,7 +5,8 @@ assert.equal(header.length,44); assert.equal(header.toString('ascii',0,4),'RIFF'
 assert.equal(header.readUInt32LE(4),65572); assert.equal(header.readUInt32LE(24),16000);
 assert.equal(header.readUInt32LE(28),32000); assert.equal(header.readUInt16LE(34),16);
 assert.equal(header.readUInt32LE(40),65536);
-for(const invalid of [-1,1.5,Infinity,NaN,4800001]) assert.throws(()=>wavHeader(invalid));
+const tenMinutes=Buffer.from(wavHeader(16000*600));assert.equal(tenMinutes.readUInt32LE(4),19200036);assert.equal(tenMinutes.readUInt32LE(40),19200000);
+for(const invalid of [-1,1.5,Infinity,NaN,9600001]) assert.throws(()=>wavHeader(invalid));
 assert.equal(validateAudioChunk(new ArrayBuffer(0)),0); assert.equal(validateAudioChunk(new ArrayBuffer(2048)),1024);
 assert.throws(()=>validateAudioChunk(new ArrayBuffer(3))); assert.throws(()=>validateAudioChunk(new ArrayBuffer(2050)));
 const pcm = values => {const buffer = new ArrayBuffer(values.length * 2), view = new DataView(buffer);values.forEach((v,i)=>view.setInt16(i*2,v,true));return buffer;};

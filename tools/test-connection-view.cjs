@@ -3,7 +3,7 @@ const {pcb2ConnectionView:view}=require('../web-console/usb-connect.js');
 const ready={macros:{version:1},companion_ready:true,companion_error:''};
 let s=view({companion:true,connected:true,state:ready});
 assert.equal(s.macroReady,true);assert.equal(s.hideChoose,true);assert.match(s.macro,/可用/);assert.doesNotMatch(s.note,/未連接|中斷/);
-s=view({connected:true,state:ready});assert.equal(s.macroReady,false);assert.match(s.macro,/桌面模式/);assert.equal(s.choose,'更換裝置');
+s=view({connected:true,state:ready});assert.equal(s.macroReady,false);assert.match(s.macro,/啟動工具/);assert.equal(s.choose,'更換裝置');assert.equal(s.hideChoose,true);
 s=view({companion:true,error:'USB 被占用，請中斷網站'});assert.equal(s.issue,true);assert.equal(s.hideChoose,false);assert.match(s.keyboard,/未連接/);assert.match(s.note,/占用/);
 s=view({companion:true,connected:true,state:{...ready,companion_ready:false,companion_error:'未啟用桌面輸入'}});assert.match(s.macro,/需檢查/);assert.equal(s.macroReady,false);assert.match(s.keyboard,/已連接/);
 s=view({connected:true,state:{}});assert.match(s.macro,/更新韌體/);

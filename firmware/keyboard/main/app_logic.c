@@ -56,7 +56,7 @@ void logic_voice_start(keypad_voice_t *v, unsigned key, unsigned effect) {
     *v = (keypad_voice_t){.effect = effect < SOUND_COUNT ? effect : 0, .key = key % 4};
     v->length = lengths[v->effect];
 }
-int16_t logic_sound_sample(keypad_voice_t voices[4], unsigned volume) {
+int32_t logic_sound_sample(keypad_voice_t voices[4], unsigned volume) {
     static const float notes[] = {261.626f, 329.628f, 391.995f, 523.251f};
     float sum = 0;
     for (unsigned i = 0; i < 4; ++i) {
@@ -73,9 +73,18 @@ int16_t logic_sound_sample(keypad_voice_t voices[4], unsigned volume) {
         } else wave = sinf(6.2831853f * (freq * t + 1400 * t * t)) * expf(-12 * t);
         sum += wave * envelope; ++v->position;
     }
-    sum = fmaxf(-1, fminf(1, sum));
     unsigned limited_volume = volume > 100 ? 100 : volume;
-    return (int16_t)(sum * (16000.0f * limited_volume / 100.0f));
+    return (int32_t)(sum * (16000.0f * limited_volume / 100.0f));
+}
+int16_t logic_limit_sample(keypad_limiter_t *limiter, int32_t sample) {
+    // Wide accumulation preserves overlapping waves. Immediate gain reduction
+    // prevents overload; a 50 ms release avoids jumps as another voice ends.
+    uint32_t magnitude=sample<0?(uint32_t)(-(int64_t)sample):(uint32_t)sample;
+    const uint32_t ceiling=28000, unity=65536;
+    uint32_t target=magnitude>ceiling?(uint32_t)(((uint64_t)ceiling*unity)/magnitude):unity;
+    if(target<limiter->gain)limiter->gain=target;
+    else limiter->gain+=(target-limiter->gain+2399)/2400;
+    return (int16_t)(((int64_t)sample*limiter->gain)/unity);
 }
 static void hue(float h, uint8_t color[3]) {
     float x = 1 - fabsf(fmodf(h / 60, 2) - 1), r = 0, g = 0, b = 0;

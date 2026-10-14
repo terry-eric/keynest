@@ -14,7 +14,9 @@ for artifact in data["files"]:
     path=manifest.parent/artifact["path"]
     if not path.resolve().is_relative_to(manifest.parent.resolve()):raise ValueError("Invalid artifact path")
     artifact.update(bytes=path.stat().st_size,sha256=hashlib.sha256(path.read_bytes()).hexdigest())
-sources={entry["path"] for entry in data["sources"]} | {"firmware/keyboard/main/macro_store.c","firmware/keyboard/main/macro_store.h"}
+sources={entry["path"] for entry in data["sources"]} | {"firmware/keyboard/main/macro_store.c","firmware/keyboard/main/macro_store.h","tools/test-key-sound.c","tools/test-key-sound.py"}
 data["sources"]=[{"path":name,"sha256":hashlib.sha256((ROOT/name).read_bytes()).hexdigest()} for name in sorted(sources)]
+data["source_snapshot_updated_at"]=date.today().isoformat()
+data["source_snapshot_note"]="Sources and artifact hashes refreshed together; hardware verification, when available, belongs to the exact firmware hash."
 manifest.write_text(json.dumps(data,ensure_ascii=False,indent=2)+"\n",encoding="utf-8",newline="\n")
 print(args.version+": "+str(len(data["files"]))+" artifacts, "+str(len(data["sources"]))+" source hashes")

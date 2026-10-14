@@ -118,6 +118,16 @@ cJSON *app_state_json(void) {
         cJSON_AddStringToObject(custom,"filename",sample.filename);
         cJSON_AddNumberToObject(custom,"frames",sample.frames); cJSON_AddNumberToObject(custom,"crc32",sample.crc32);
         cJSON_AddNumberToObject(custom,"max_seconds",2);
+        cJSON_AddBoolToObject(custom,"per_key",sample.per_key);
+        cJSON *sounds=cJSON_AddArrayToObject(custom,"keys");
+        for(unsigned i=0;sounds && i<4;++i) {
+            const key_sound_clip_t *clip=&sample.keys[i];cJSON *item=cJSON_CreateObject();
+            cJSON_AddBoolToObject(item,"ready",clip->ready);cJSON_AddBoolToObject(item,"custom",clip->custom);
+            cJSON_AddStringToObject(item,"storage",clip->storage==REC_SD?"sd":"flash");
+            cJSON_AddStringToObject(item,"filename",clip->filename);cJSON_AddStringToObject(item,"error",clip->error);
+            cJSON_AddNumberToObject(item,"frames",clip->frames);cJSON_AddNumberToObject(item,"crc32",clip->crc32);
+            cJSON_AddItemToArray(sounds,item);
+        }
         cJSON_AddStringToObject(custom,"error",sample.error);
         cJSON *plays=cJSON_AddArrayToObject(custom,"plays"), *rendered=cJSON_AddArrayToObject(custom,"rendered");
         for(unsigned i=0;i<4;++i) {
@@ -220,15 +230,22 @@ static bool uint32_field(cJSON *body,const char *name,uint32_t *out) {
     *out=(uint32_t)v->valuedouble; return true;
 }
 static esp_err_t sound_command(const char *path,cJSON *body) {
+    if(!strcmp(path,"/api/sound/default")) {
+        const char *const fields[]={"key"};uint32_t key;
+        if(!fields_match(body,fields,1) || !uint32_field(body,"key",&key) || key>3)return ESP_ERR_INVALID_ARG;
+        return key_sound_use_default(key);
+    }
     cJSON *owner=cJSON_GetObjectItemCaseSensitive(body,"owner");
     if(!cJSON_IsString(owner) || strlen(owner->valuestring)!=16) return ESP_ERR_INVALID_ARG;
     if(!strcmp(path,"/api/sound/begin")) {
-        const char *const fields[]={"owner","storage","frames","crc32"};
+        const char *const fields[]={"owner","storage","frames","crc32","key"};
         cJSON *storage=cJSON_GetObjectItemCaseSensitive(body,"storage"); uint32_t frames,crc;
-        if(!fields_match(body,fields,4) || !cJSON_IsString(storage) ||
+        cJSON *key_item=cJSON_GetObjectItemCaseSensitive(body,"key");uint32_t key=0;int selected=-1;
+        if(key_item){if(!uint32_field(body,"key",&key)||key>3)return ESP_ERR_INVALID_ARG;selected=(int)key;}
+        if(!fields_match(body,fields,5) || !cJSON_IsString(storage) ||
            !uint32_field(body,"frames",&frames) || !uint32_field(body,"crc32",&crc)) return ESP_ERR_INVALID_ARG;
         unsigned target=!strcmp(storage->valuestring,"flash")?REC_FLASH:!strcmp(storage->valuestring,"sd")?REC_SD:99;
-        return key_sound_begin(owner->valuestring,target,frames,crc);
+        return key_sound_begin(owner->valuestring,target,frames,crc,selected);
     }
     if(!strcmp(path,"/api/sound/chunk")) {
         const char *const fields[]={"owner","offset","pcm","crc32"};
@@ -402,7 +419,7 @@ esp_err_t web_server_start(void) {
     err = httpd_register_uri_handler(server, &audio); if (err != ESP_OK) return err;
     httpd_uri_t microphone = {.uri = "/api/microphone", .method = HTTP_GET, .handler = microphone_get};
     err = httpd_register_uri_handler(server, &microphone); if (err != ESP_OK) return err;
-    const char *commands[] = {"/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/microphone/channel", "/api/sound/begin", "/api/sound/chunk", "/api/sound/commit", "/api/sound/cancel", "/api/device/restart", "/api/macro", "/api/macro/host", "/api/macro/ack"};
+    const char *commands[] = {"/api/config", "/api/trigger", "/api/record", "/api/save", "/api/sd", "/api/microphone/channel", "/api/sound/begin", "/api/sound/chunk", "/api/sound/commit", "/api/sound/cancel", "/api/sound/default", "/api/device/restart", "/api/macro", "/api/macro/host", "/api/macro/ack"};
     for (unsigned i = 0; i < sizeof(commands) / sizeof(commands[0]); ++i) {
         httpd_uri_t uri = {.uri = commands[i], .method = HTTP_POST, .handler = command_post};
         err = httpd_register_uri_handler(server, &uri); if (err != ESP_OK) return err;

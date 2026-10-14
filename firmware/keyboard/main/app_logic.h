@@ -16,6 +16,7 @@ typedef struct {
 } keypad_config_t;
 typedef struct { uint8_t modifiers, reserved, keys[6]; } keypad_report_t;
 typedef struct { unsigned position, length; uint8_t effect, key; } keypad_voice_t;
+typedef struct { uint32_t gain; } keypad_limiter_t;
 void logic_defaults(keypad_config_t *config);
 bool logic_config_valid(const keypad_config_t *config);
 void logic_hid_report(uint8_t down, const keypad_config_t *config, keypad_report_t *report);
@@ -23,6 +24,7 @@ int16_t logic_mic_pcm16(int32_t pcm24, unsigned gain);
 void logic_wav_header(uint8_t header[44], uint32_t frames);
 uint32_t logic_crc32(uint32_t seed, const void *data, size_t length);
 void logic_voice_start(keypad_voice_t *voice, unsigned key, unsigned effect);
-int16_t logic_sound_sample(keypad_voice_t voices[4], unsigned volume);
+int32_t logic_sound_sample(keypad_voice_t voices[4], unsigned volume);
+int16_t logic_limit_sample(keypad_limiter_t *limiter, int32_t sample);
 void logic_led_frame(const keypad_config_t *config, uint64_t now_ms,
                      const uint64_t pulses[4], uint8_t down, float mic_peak, uint8_t rgb[4][3]);

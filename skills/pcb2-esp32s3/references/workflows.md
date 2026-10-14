@@ -40,16 +40,16 @@ Wi-Fi AP 是備用操作方式：`PCB2-Keypad-XXXX`、預設 `pcb2play`、`http:
 
 ## 錄音與按鍵音
 
-- 錄音目的地：browser 最長預設 60 秒，需將瀏覽器 RAM 的 WAV 下載；flash 最新一段上限 2.048 秒；sd 預設 60 秒、新建 REC WAV。單一串流需維持 owner，不能讀取或停止別人的錄音。
+- 錄音目的地：browser 最長預設 600 秒，需將瀏覽器 RAM 的 WAV 下載；flash 最新一段上限 2.048 秒；sd 預設 600 秒、新建 REC WAV。單一串流需維持 owner，不能讀取或停止別人的錄音。
 - 即時監測 `/api/microphone` 讀最近 64 ms PCM 視窗，不消耗錄音串流，不能拼接成連續錄音。聲道控制 `/api/microphone/channel` 只在錄音停止後使用。
-- 自訂按鍵音：Web 本機解碼音檔或使用最新錄音，裁切最多 2 秒，轉 16 kHz mono PCM16；四鍵共用音效，可混合四聲部。Flash 音效獨立於最新錄音，SD 使用新建 KEY WAV。
+- 自訂按鍵音：Web 本機解碼音檔或使用最新錄音，裁切最多 2 秒，轉 16 kHz mono PCM16；v9 可逐鍵指定音效，未指定時使用共用音效，可混合四聲部；最後經平滑音量限制。Flash 音效獨立於最新錄音，SD 使用新建 KEY WAV。
 - v7 `/api/sound/begin`、`chunk`、`commit`、`cancel` 使用 owner、offset、block CRC 與完整 CRC。host 只對同一冪等 begin／chunk／commit 的指定暫時錯誤有限重送，最多 5 次；不要普遍重送 trigger、restart 或 Flash 寫入操作。
 
 ## 燒錄
 
 先核對實板、app image、manifest、目標分割區與目前配置，再備份需要保留的資料。一般 app 更新寫 `0x10000`；bootloader／partition table 改變時，需一起檢查，不可只假設寫 app 已完成。
 
-| v7 區域 | 起點 | 大小 |
+| v9 區域 | 起點 | 大小 |
 |---|---|---|
 | bootloader image | 0x0 | 以產物大小為準 |
 | partition table image | 0x8000 | 以產物大小為準 |
@@ -57,7 +57,9 @@ Wi-Fi AP 是備用操作方式：`PCB2-Keypad-XXXX`、預設 `pcb2play`、`http:
 | PHY | 0xf000 | 0x1000 |
 | factory app | 0x10000 | 0x200000 |
 | 最新 Flash 錄音 | 0x210000 | 0x40000 |
-| Flash 按鍵音 | 0x250000 | 0x40000 |
+| Flash 按鍵音 | 0x250000 | 0x140000 |
+
+v9 首次更新必須同時寫入分割表與 app；只有按鍵音 partition 尾端擴充，前 `0x40000` 保留共用音效。先確認新增 `0x290000–0x390000` 空間沒有其他資料。舊表仍可開機，但不支援個別鍵上傳。`/api/sound/begin` 的可選 `key` 為 0～3，省略維持共用；`/api/sound/default` 恢復選定鍵共用音效。
 
 `firmware.bin` 不是合併映像，不能寫到 `0x0`。保留原始備份及實際燒錄範圍；更新後獨立 `verify_flash`，必要時核對持久資料區，再確認 HID／CDC 重枚舉、設定與音訊反應。
 

@@ -216,7 +216,7 @@ class UsbDevice:
                     if not chunk:
                         break
                     wav.extend(chunk)
-                    if len(wav) > 44 + 16000 * 300 * 2:
+                    if len(wav) > 44 + 16000 * 600 * 2:
                         raise DeviceError(502, "Recording exceeds maximum length")
                 return bytes(wav), {"Content-Type": "audio/wav", "Content-Disposition": f'attachment; filename="{filename}"'}
             finally:

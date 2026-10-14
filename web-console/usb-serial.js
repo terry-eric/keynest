@@ -156,7 +156,7 @@ class PCB2SerialTransport {
         for (;;) {
           const bytes = pcb2Binary(await this.wire("/api/file/read", undefined, {signal}));
           if (!bytes.length) break;
-          count += bytes.length; if (count > 44 + 16000 * 300 * 2) throw new PCB2SerialError(502, "錄音超過大小上限。");
+          count += bytes.length; if (count > 44 + 16000 * 600 * 2) throw new PCB2SerialError(502, "錄音超過大小上限。");
           chunks.push(bytes);
         }
         return new Response(new Blob(chunks, {type:"audio/wav"}), {headers:{"Content-Type":"audio/wav", "Content-Disposition":`attachment; filename="${info.filename}"`}});

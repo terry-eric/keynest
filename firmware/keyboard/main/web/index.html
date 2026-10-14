@@ -39,14 +39,18 @@
       <label class="range-label" for="volume">喇叭音量 <output id="volume-value">10%</output></label><input id="volume" type="range" min="0" max="100" value="10">
       <div class="sound-note"><span class="sound-icon">♪</span><div><strong>每顆按鍵，都有自己的音高</strong><p>四種合成音效，帶淡入淡出。可同時混合四鍵聲音。</p></div></div><button id="test-sound" class="button secondary">♪ 測試音效</button>
       <div class="custom-sound">
-        <h3>自己的按鍵聲</h3><p class="caption">四顆按鍵共用一段音效，最長 2 秒。保存後可直接在板上播放。</p>
+          <h3>自己的按鍵聲</h3><p class="caption">每顆按鍵可保存不同音效，最長 2 秒。存到內建儲存，不插 SD 也能播放。</p>
+          <label class="field-label" for="sound-key">要替哪顆鍵換聲音？</label><select id="sound-key"><option value="0">第 1 顆鍵</option><option value="1">第 2 顆鍵</option><option value="2">第 3 顆鍵</option><option value="3">第 4 顆鍵</option><option value="common">共用音效 · 未另設音效的按鍵</option></select>
+          <p class="caption" id="sound-key-summary" role="status"></p>
         <label class="field-label" for="sound-file">上傳聲音</label><input id="sound-file" type="file" accept="audio/*,.wav,.mp3,.ogg,.m4a,.flac">
         <button class="button secondary" id="sound-recording">使用最新錄音</button>
         <p class="caption" id="sound-source">請選音效檔，或使用板子／瀏覽器錄好的聲音。</p>
         <div class="clip-fields"><label>片段起點（秒）<input id="clip-start" type="number" min="0" step="0.05" value="0"></label><label>片段長度（秒）<input id="clip-length" type="number" min="0.05" max="2" step="0.05" value="1"></label></div>
         <label class="normalize"><input id="clip-normalize" type="checkbox">放大較小的錄音音量</label>
+          <audio id="sound-preview" controls preload="none" aria-label="試聽裁切後的音效" hidden></audio><p class="caption" id="sound-clip-error" role="status"></p>
         <label class="field-label" for="sound-storage">音效保存在哪裡？</label><select id="sound-storage"><option value="flash">內建儲存 · Flash</option><option value="sd">microSD</option></select>
         <button class="button primary" id="sound-upload" disabled>保存並設為按鍵聲</button>
+          <div class="record-actions"><button class="button secondary" id="sound-test-key" disabled>在鍵盤試聽這顆鍵</button><button class="quiet" id="sound-default" disabled>恢復使用共用音效</button></div>
         <p class="caption" id="sound-status" role="status">正在確認自訂音效功能。</p>
       </div>
     </section>

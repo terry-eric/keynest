@@ -157,7 +157,7 @@ esp_err_t recorder_list_sd(recorder_sd_file_t *files,size_t capacity,size_t *cou
         if(++scanned>256 || *count>=capacity){*truncated=true;break;}
         if(!sound_file_name(entry->d_name))continue;
         char path[40];snprintf(path,sizeof(path),"/sdcard/%.12s",entry->d_name);
-        struct stat st;if(stat(path,&st) || !S_ISREG(st.st_mode) || st.st_size<44 || st.st_size>44+CAPTURE_RATE*300*2)continue;
+        struct stat st;if(stat(path,&st) || !S_ISREG(st.st_mode) || st.st_size<44 || st.st_size>44+CAPTURE_RATE*600*2)continue;
         snprintf(files[*count].name,sizeof(files[*count].name),"%.12s",entry->d_name);
         files[*count].bytes=st.st_size;++*count;
     }

@@ -13,7 +13,7 @@ from macro_input import NativeInput, execute, validate_program
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSETS = {"index.html","app.js","style.css","usb-serial.js","usb-connect.js","usb-connect.css","studio.js","studio.css","companion.js","build-info.json","gsap.min.js"}
-POSTS = {"/api/config","/api/trigger","/api/record","/api/save","/api/sd","/api/microphone/channel","/api/sound/begin","/api/sound/chunk","/api/sound/commit","/api/sound/cancel","/api/device/restart","/api/macro"}
+POSTS = {"/api/config","/api/trigger","/api/record","/api/save","/api/sd","/api/microphone/channel","/api/sound/begin","/api/sound/chunk","/api/sound/commit","/api/sound/cancel", "/api/sound/default","/api/device/restart","/api/macro"}
 GETS = {"/api/state","/api/microphone","/api/audio","/api/recording.wav","/api/sd/files","/api/sd/recording.wav"} | {f"/api/macro/{i}" for i in range(4)}
 
 class MacroRunner:

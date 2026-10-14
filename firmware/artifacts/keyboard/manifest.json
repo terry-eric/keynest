@@ -1,6 +1,6 @@
 {
-  "built_at": "2026-10-14",
-  "version": "macro-studio-v8",
+  "built_at": "2026-10-15",
+  "version": "keypad-studio-v9",
   "project": "pcb2_keypad",
   "target": "esp32s3",
   "idf": "5.5.0",
@@ -16,19 +16,19 @@
     {
       "path": "partitions.bin",
       "bytes": 3072,
-      "sha256": "0fffa1402d1ed65f8f2594881ea684d9090ef6cd1988ed93e57e671210284c14",
+      "sha256": "04892c488e68ae0bf14c6139b74cf2e687949960fb9b7d46c0bf70916f2bb3a6",
       "flash_offset": "0x8000"
     },
     {
       "path": "firmware.bin",
-      "bytes": 1095648,
-      "sha256": "7814c4231b338e337cd1fefa97f20d3bdefcc90c9dda244c53e5f6cd9e938a0d",
+      "bytes": 1101984,
+      "sha256": "2fec0539366cb5a35860cfecdd8660a06118cc130e306b55d03f585558dc3cc9",
       "flash_offset": "0x10000"
     },
     {
       "path": "firmware.elf",
-      "bytes": 1555348,
-      "sha256": "76babe6fdae956bd02cd0a939288e887a119c6aab03c7a0acccf8887420c05db"
+      "bytes": 1563672,
+      "sha256": "d615a75c883766e6346da0538d62ab9cf810cbadd85e394bc1e390db569c53b6"
     }
   ],
   "sources": [
@@ -94,7 +94,7 @@
     },
     {
       "path": "firmware/keyboard/main/Kconfig.projbuild",
-      "sha256": "335417b63fee67a65bceaf44400a524559a9bc7d1ef028e637505986b371f7fe"
+      "sha256": "5d46adb59cb6f49a9a93dddad28a0353346f8a80e89148f4770599ece543241b"
     },
     {
       "path": "firmware/keyboard/main/app.h",
@@ -106,11 +106,11 @@
     },
     {
       "path": "firmware/keyboard/main/app_logic.c",
-      "sha256": "5096579a1675be5bd02f62e37799426ce38e8b83c99966934d57d2c66d925abd"
+      "sha256": "9216c3b70234d7c08b432e958295f535a78ebbdcbf43c2008096e96a3e70b79c"
     },
     {
       "path": "firmware/keyboard/main/app_logic.h",
-      "sha256": "1a2a43c9aa1c2dd4d2b1062a635905b1f73e4742e9c956d700b32097d903f1e0"
+      "sha256": "bd2de994367bc9911590ec43a4ae5c2aa3fe18c6877527a6b753921fc2c4df3e"
     },
     {
       "path": "firmware/keyboard/main/app_main.c",
@@ -118,7 +118,7 @@
     },
     {
       "path": "firmware/keyboard/main/audio_worker.c",
-      "sha256": "e5aaf78b8edfc0bd591d2ab6f5cfab5596ca5743beb8b90c45131db6de56dbed"
+      "sha256": "bce7a6ac278c4c142530ee6b72b2037f473ae5d2800c34a2da2b32bfe5d1e422"
     },
     {
       "path": "firmware/keyboard/main/controller.c",
@@ -146,11 +146,11 @@
     },
     {
       "path": "firmware/keyboard/main/key_sound.c",
-      "sha256": "8317f2099d44b40d825ac1c0ca029abe6a94fd2fcf8dc5f8623e3d9c92ae26bd"
+      "sha256": "b3562d25c7053dae5109d87b9ec00cd65086bf717c7fbbec64fb879788cbbe2a"
     },
     {
       "path": "firmware/keyboard/main/key_sound.h",
-      "sha256": "e707b127b420a7a9dd1e2e22949c209921d394a28d176a59be6d946f333ef09e"
+      "sha256": "7fed4747bb336c7c5451555a6d61a41c66b150911efa91b79fa2098da2adeb45"
     },
     {
       "path": "firmware/keyboard/main/macro_store.c",
@@ -170,7 +170,7 @@
     },
     {
       "path": "firmware/keyboard/main/recorder.c",
-      "sha256": "7674dbb6bb1a1dd922bfaf33ca4101021f29b695247ab3d8ceffe8870085dcec"
+      "sha256": "a3c95a115236f662347e6430ee6f52ef32c0950551cc5dac84c685aaf5e6e40e"
     },
     {
       "path": "firmware/keyboard/main/recorder.h",
@@ -186,11 +186,11 @@
     },
     {
       "path": "firmware/keyboard/main/web/app.js",
-      "sha256": "0bc7240838ad583b6bfbe33b842b7f8386fa8140510d31fe19925b5486c8307d"
+      "sha256": "a923d19bad570feec6b4fe1b7a5d6a4733155bc195c5e067038d6fd3eff39d43"
     },
     {
       "path": "firmware/keyboard/main/web/index.html",
-      "sha256": "4a253fe9a823d8c9e97686792547577d4d62a903288828f1605a77299c838953"
+      "sha256": "f313ab4661d0e62b025c9275070c4ee3fb38fee526874d36aad320ffa58e118a"
     },
     {
       "path": "firmware/keyboard/main/web/style.css",
@@ -198,11 +198,11 @@
     },
     {
       "path": "firmware/keyboard/main/web_server.c",
-      "sha256": "2e2dd05caee49756e0a939ca52ae76ecc157a2b83d30f31d2fb4bcde63511b75"
+      "sha256": "c1d1468bf83b886df9f051b227ee4b43a7f6ab57c65cbed310ab9c6f79e0c4da"
     },
     {
       "path": "firmware/keyboard/partitions.csv",
-      "sha256": "a9960af2561d5dbb5cf19cd375c604fe958c27790c9298763a21b75fc989080a"
+      "sha256": "3a5a53520a4e77a6320cd5e0e18740cf9f306fa1f00653b52bef16171796c4c6"
     },
     {
       "path": "firmware/keyboard/platformio.ini",
@@ -210,7 +210,7 @@
     },
     {
       "path": "firmware/keyboard/sdkconfig.defaults",
-      "sha256": "04ec172301661736df741cc66027dfbb08616376015b46667ae3e37955a8a441"
+      "sha256": "4009dcf9155aefdf9399e00dec0bc7be414bc1927d823a0a0f472760979c056d"
     },
     {
       "path": "tools/check-pin-map.py",
@@ -230,7 +230,7 @@
     },
     {
       "path": "tools/keypad_usb.py",
-      "sha256": "546f4745990afee108c839d3eda07c842d79e72314898a1abeb025a340f6d38c"
+      "sha256": "d667f674224b821c9061ada6e94851e0b40f7952b00673d206c4629ace458c7a"
     },
     {
       "path": "tools/monitor-test-includes/esp_timer.h",
@@ -246,7 +246,7 @@
     },
     {
       "path": "tools/preview-keypad.py",
-      "sha256": "24ae8723712ac1efe485beb920d38665e06c52e1f795d3660329621e5e7388a6"
+      "sha256": "914c9e417228ca6d5a2cc3df5c8b7deb9a43bd6ce76520c1a97703d7f5e7c686"
     },
     {
       "path": "tools/test-board-logic.c",
@@ -261,12 +261,20 @@
       "sha256": "d5a4b26bedf2ac11bbbedf414adf2ede9b6c12ea80a70ed518fcb2c554d5221a"
     },
     {
+      "path": "tools/test-key-sound.c",
+      "sha256": "4a3af669110329c2c323378b868efbe69d30f33f61c9792013a35397b0cf63df"
+    },
+    {
+      "path": "tools/test-key-sound.py",
+      "sha256": "926baad83fb6ac2fb3bba5a3b19febf96dee2b8d22c0257dca4154e55c2781cf"
+    },
+    {
       "path": "tools/test-keypad-flash.c",
       "sha256": "041318d09d96a5c8e3519912c3233ce25422acc26008fd368b04894e5c077072"
     },
     {
       "path": "tools/test-keypad-logic.c",
-      "sha256": "203684878d54d96e2124c0b00f5a7bbe6c5b18b260a53327ab5998af65a83405"
+      "sha256": "9d07d9c98c8b39bdceb64ee38fd5f6f4a30bf48e9da966f4cb4e6f6829eb28f9"
     },
     {
       "path": "tools/test-keypad-preview.py",
@@ -278,7 +286,7 @@
     },
     {
       "path": "tools/test-keypad-web.cjs",
-      "sha256": "66d87d50d6e7a119bec0110a26fccde0a6f0657c7c8a6c2feb49e91cc53a1526"
+      "sha256": "b8989f6d6fed268255ecd49822978785dc96ef9ef492a74d09348d78cf52f117"
     },
     {
       "path": "tools/test-mic-monitor.c",
@@ -301,35 +309,50 @@
     "Intermittent SD capacity / mount / CRC failures",
     "Microphone human speech quality",
     "SD custom sound persistence",
-    "Macro program NVS persistence across restart",
     "macOS and Linux Unicode input",
-    "Windows Unicode text, multi-key and multi-step physical macro input"
-  ],
-  "validated": [
-    "v8 host protocol, Unicode and macro-store tests",
-    "v8 ESP-IDF build",
-    "v8 bootloader and app independent Flash verification",
-    "v8 persistent settings and audio preservation",
-    "v8 runtime macro API and Windows companion connection",
-    "Windows physical key Ctrl+C macro; user confirmed Ctrl+V paste"
+    "Windows Unicode text, multi-key and multi-step physical macro input",
+    "Intermittent USB sound chunk CRC/argument rejection; canceled uploads retain the active clip; a later upload completed",
+    "Subjective simultaneous speaker sound quality",
+    "Ten-minute SD recording and long SD WAV download"
   ],
   "elf": "Same build with debug sections removed for public distribution. Flashing and independent verification use firmware.bin; ELF is not flashed.",
-  "validation": "Bootloader and app independently flash-verified; settings/audio preserved. Windows physical Ctrl+C macro and paste result confirmed by user; Unicode and multi-step input remain pending.",
+  "validation": "Host tests, ESP-IDF build, independent Flash verification, four separate 2-second sound uploads/reboot/rendering, and real 10-minute USB recording passed on one PCB2. Subjective audio quality and SD long recording are not verified.",
+  "source_snapshot_updated_at": "2026-10-15",
+  "source_snapshot_note": "Sources and artifact hashes refreshed together; hardware verification, when available, belongs to the exact firmware hash.",
   "physical_validation": {
-    "date": "2026-10-14",
-    "boards": 1,
+    "date": "2026-10-15",
+    "firmware_sha256": "2fec0539366cb5a35860cfecdd8660a06118cc130e306b55d03f585558dc3cc9",
+    "written_offsets": [
+      "0x8000",
+      "0x10000"
+    ],
     "independent_verify_flash": true,
-    "persistent_settings_and_audio_match": true,
-    "application_settings_restored": true,
-    "runtime_macro_api_version": 1,
-    "macro_programs_read": 4,
-    "psram_bytes": 2097152,
-    "windows_companion_connected": true,
-    "macro_input_tested": true,
-    "macro_persistence_tested": false,
-    "macro_input_scope": "Windows physical Ctrl+C chord; paste result confirmed by user",
-    "windows_companion_events_completed": 3
-  },
-  "source_snapshot_updated_at": "2026-10-14",
-  "source_snapshot_note": "Host USB tools refreshed after tested connection fixes; firmware sources and all build artifacts unchanged."
+    "nvs_phy_preserved_during_update": true,
+    "recording_common_sound_preserved_during_update": true,
+    "per_key_sound": {
+      "per_key": true,
+      "clips": 4,
+      "frames_each": 32000,
+      "reboot_crc_verified": true,
+      "rendered_each": [
+        96000,
+        96000,
+        96000,
+        96000
+      ],
+      "original_config_programs_common_sound_restored": true,
+      "subjective_audio_quality_verified": false
+    },
+    "usb_recording": {
+      "frames": 9600000,
+      "duration_seconds": 600.0,
+      "wall_seconds": 600.109,
+      "dropped_frames": 0,
+      "wav_bytes": 19200044,
+      "transport": "USB via local companion"
+    },
+    "recording_limit_seconds": 600,
+    "original_four_programs_and_config_retained": true,
+    "sd_ten_minute_recording_verified": false
+  }
 }

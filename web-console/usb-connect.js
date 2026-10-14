@@ -4,11 +4,11 @@ function pcb2ConnectionView({companion=false,connected=false,working=false,state
   const version=state?.macros?.version===1, macroReady=connected&&companion&&!!state?.companion_ready;
   const inputIssue=connected&&companion?state?.companion_error||"":"";
   const keyboard=working?"鍵盤：連接中…":connected?"鍵盤：已連接":"鍵盤：未連接";
-  const macro=!connected?"文字與巨集：尚未就緒":!version?"文字與巨集：需更新韌體":!companion?"文字與巨集：需桌面模式":inputIssue?"文字與巨集：需檢查":macroReady?"文字與巨集：可用":"文字與巨集：等待工具";
-  const title=working?"正在連接你的鍵盤":!supported?"換到支援 USB 的瀏覽器":!connected?companion?"接上鍵盤，自動開始設定":"先接上你的四鍵鍵盤":"PCB2 四鍵鍵盤";
-  const description=companion?connected?"在這裡設定按鍵與巨集，保留桌面工具執行即可。":"插上 USB 資料線；桌面工具會自動偵測，不必在網站重複連接。":supported?"快捷鍵、燈光與錄音直接透過 USB 設定。文字與多鍵巨集請使用桌面模式。":"請使用電腦版 Chrome／Edge，或改用桌面模式。";
-  const note=error||inputIssue||(working?"正在讀取鍵盤設定…":connected?companion?"切到想操作的程式，再按實體鍵；巨集會輸入到目前使用的程式。":"普通快捷鍵可直接使用；文字與多鍵巨集需切換桌面模式。":companion?"若其他網站或串列監控正連接鍵盤，請先中斷那邊的連線。":"第一次按「連接鍵盤」，選擇 PCB2 的 USB 裝置。電腦保持原本 Wi-Fi。");
-  return {title,description,keyboard,macro,macroReady:macroReady&&!inputIssue,note,issue:!!(error||inputIssue),choose:working?"正在連接…":companion?"重新檢查鍵盤":connected?"更換裝置":"連接鍵盤",hideChoose:companion&&connected};
+  const macro=!connected?"文字與巨集：尚未就緒":!version?"文字與巨集：需更新韌體":!companion?"文字與巨集：需啟動工具":inputIssue?"文字與巨集：需檢查":macroReady?"文字與巨集：可用":"文字與巨集：等待工具";
+  const title=working?"正在連接你的鍵盤":!supported?"請用 Chrome 或 Edge 開啟":!connected?companion?"接上鍵盤，就能開始設定":"連接你的鍵盤":"PCB2 四鍵鍵盤";
+  const description=companion?connected?"文字與巨集工具正在管理連線。":"用 USB 資料線接上 PCB2，工具會自動找到鍵盤。":supported?"用 USB 資料線接上 PCB2，再按下方按鈕選擇裝置。":"USB 連接需要電腦版 Chrome 或 Edge。也可以先試用介面。";
+  const note=error||inputIssue||(working?"正在讀取鍵盤設定…":connected?companion?"切到想操作的程式，再按實體鍵即可。":"連接成功，可以開始設定你的按鍵。":companion?"若其他網站或串列監控正連接鍵盤，請先中斷那邊的連線。":"設定完成後會保存在鍵盤，拔掉再插上也會保留。");
+  return {title,description,keyboard,macro,macroReady:macroReady&&!inputIssue,note,issue:!!(error||inputIssue),choose:working?"正在連接…":companion?"重新檢查鍵盤":connected?"更換裝置":"連接鍵盤",hideChoose:connected};
 }
 if(typeof module==="object"&&module.exports)module.exports={pcb2ConnectionView};
 else {
@@ -16,7 +16,8 @@ window.PCB2Transport = new URLSearchParams(location.search).get("companion") ===
 document.addEventListener("DOMContentLoaded", () => {
   const $ = id => document.getElementById(id), serial = navigator.serial, demo = new URLSearchParams(location.search).get("demo") === "1";
   const transport = window.PCB2Transport, companion = transport instanceof PCB2CompanionTransport; let ports = [], working = false, connectionError = "";
-  $("desktop-console-help").hidden = companion || demo;
+  $("desktop-console-help").hidden = demo;
+  $("desktop-console").hidden = companion;
   $("offline").querySelector("span").textContent = "請使用上方 USB 連接功能。若埠被占用，先關閉 Python 預覽工具或串列監控；此網頁不需要切換 Wi-Fi。";
   $("target-help").textContent = "不用 SD 卡。請保持網頁開啟與 USB 連線，完成後下載 WAV。";
   $("device-address").textContent = "USB 控制台 · 電腦維持原本 Wi-Fi";
@@ -34,15 +35,15 @@ document.addEventListener("DOMContentLoaded", () => {
     $("serial-status").classList.toggle("active", transport.connected);
     $("macro-connection-status").textContent=view.macro;$("macro-connection-status").classList.toggle("active",view.macroReady);
     note(view.note,view.issue);
-    $("serial-choose").textContent=view.choose;$("serial-choose").hidden=view.hideChoose;
+    $("serial-choose").textContent=view.choose;$("serial-choose").hidden=view.hideChoose&&panel.dataset.expanded!=="true";
     $("serial-choose").classList.toggle("primary",!transport.connected);$("serial-choose").classList.toggle("secondary",transport.connected);
     $("usb-connect-title").textContent=view.title;$("usb-connect-description").textContent=view.description;
-    $("usb-mode-label").textContent=companion?"桌面模式":"瀏覽器模式";
+    $("usb-mode-label").textContent=companion?"文字與巨集工具連線":"USB 直接連接";
     document.querySelector(".usb-more").hidden=companion;
     if (companion) { $("serial-ports").disabled = $("serial-connect").disabled = $("serial-disconnect").disabled = $("serial-auto").disabled = true; }
   }
   transport.onChange = update;
-  $("connection-manage").addEventListener("click",()=>{const panel=document.querySelector('.usb-panel'),expanded=panel.dataset.expanded!=="true";panel.dataset.expanded=String(expanded);$("connection-manage").setAttribute("aria-expanded",String(expanded));$("connection-manage").textContent=expanded?"收起連線設定":"連線設定";});
+  $("connection-manage").addEventListener("click",()=>{const panel=document.querySelector('.usb-panel'),expanded=panel.dataset.expanded!=="true";panel.dataset.expanded=String(expanded);$("connection-manage").setAttribute("aria-expanded",String(expanded));$("connection-manage").textContent=expanded?"收起連線設定":"連線設定";update();});
   try { $("serial-auto").checked = localStorage.getItem("pcb2-auto-connect") !== "false"; } catch {}
   async function refresh() {
     if (!serial || companion) return;
@@ -55,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (working || transport.busy) return;
     working = true; connectionError = ""; update();
     try { await transport.connect(port); await refresh(); }
-    catch (error) { connectionError = error.message; note(error.message, true); }
+    catch (error) { connectionError = error.name==='NetworkError'?"鍵盤可能正由其他程式連接。請先中斷那邊的連線，或回到已開啟的文字與巨集工具。":error.message; note(connectionError, true); }
     finally { working = false; update(); }
   }
   $("serial-choose").addEventListener("click", async () => {
@@ -67,14 +68,14 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) { note(error.name === "NotFoundError" ? "已取消選擇。接上板子後可再選一次。" : error.message, error.name !== "NotFoundError"); }
   });
   $("serial-connect").addEventListener("click", () => void connect(ports[Number($("serial-ports").value)]));
-  $("desktop-console").addEventListener("click", async event => {
+  for(const id of ['desktop-console','tool-console-return'])$(id).addEventListener("click", async event => {
     event.preventDefault();
-    if (transport.busy || working) { note("請先完成錄音、下載或音效保存，再開啟桌面控制台。",true); return; }
+    if (transport.busy || working) { note("請先完成錄音、下載或音效保存，再開啟文字與巨集工具。",true); return; }
     try {
       if (transport.connected) await transport.disconnect();
       $("serial-auto").checked=false;
       try { localStorage.setItem("pcb2-auto-connect","false"); } catch {}
-      location.assign($("desktop-console").href);
+      location.assign($(id).href);
     }
     catch (error) { note(error.message,true); }
   });

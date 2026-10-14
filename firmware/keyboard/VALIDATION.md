@@ -1,4 +1,18 @@
-# PCB2 Keypad v8 公開驗證摘要
+# PCB2 Keypad v9 公開驗證摘要
+
+2026-10-15，`keypad-studio-v9`，ESP-IDF 5.5.0／PlatformIO 6.2.0。本版實機與來源證據綁定 `firmware/artifacts/keyboard/manifest.json` 的 firmware SHA-256；下方 v8／v7 為歷史紀錄。
+
+- 完整備份 4 MB Flash，核對 v8 分割表及 app，確認新增音效空間原本全為空白。免按 BOOT 切換成功；只寫 `0x8000` 分割表及 `0x10000` app，獨立 `verify_flash` 通過。NVS／PHY、Flash 錄音、原共用音效及擴充空間在重啟前逐 byte 比對一致。
+- `key_sound` 僅從尾端擴大至 `0x140000`；原共用雙 slot 留在前 `0x40000`，四顆鍵各增加獨立雙 slot。每鍵 CRC、owner／offset 驗證、舊版共用音效相容、重送及 NOR 擦除／PCM／metadata 中途失敗測試通過。
+- 實板四鍵各上傳不同的 32,000 frames（2 秒）Flash PCM；真正重啟後四份 CRC 一致。依序快速觸發形成重疊播放，每鍵均完整渲染 96,000 個 48 kHz 輸出樣本。完成後移除合成測試音效覆寫、恢復原音量／音效風格，四份原按鍵 program 與共用音效維持一致。
+- 上傳測試曾有 CRC 及 `ESP_ERR_INVALID_ARG` 拒絕，取消後重做成功；未忽略校驗或加入任意控制命令重送。這個既有 USB 間歇問題仍待定位，成功校驗不代表所有傳輸都穩定。
+- 實板連續 USB 錄音 600.0000 秒，接收 9,600,000 frames，掉樣本 0；WAV 19,200,044 bytes，header／PCM 長度一致。透過本機工具持續讀取，沒有改電腦 Wi-Fi。音檔與備份只留在本機，未發佈。
+- 編譯後 `CONFIG_PCB2_RECORD_SECONDS=600` 已核對，實板回報上限 600。瀏覽器／SD 長錄音上限改為 10 分鐘，固定串流緩衝維持 8,192 frames；Flash 最新短錄音仍為 32,768 frames（2.048 秒）。10 分鐘 SD 錄音與長檔下載未實測。
+- 合成聲與自訂聲使用 32-bit 累加及同一音量限制器，瞬時訊號維持 ±28,000 內，降低增益後約 50 ms 釋放；離線測試確認低音量不變、四聲部超量時不溢位、聲部結束時增益不突跳。喇叭主觀音質及麥克風人聲品質尚未由使用者確認。
+- 控制台 v6：未連線只顯示連接卡片，保留動畫；文字／巨集工具說明移至相關按鍵編輯器。瀏覽器實際操作確認四鍵上傳指定的 key／片段長度、裁切預覽、恢復共用；斷線仍可下載既有 WAV，快捷鍵與文字草稿重新連接後保留。390 px 與 1280 px 版面檢查通過。
+- 通過 USB 14 項、本機巨集工具 8 項、舊預覽 5 項、Web Serial CRC／owner／取消／重送、WAV 10 分鐘邊界、裁切正規化、按鍵擷取／巨集及網站建置檢查。新增 `python tools/test-key-sound.py` 執行真實音效實作的 NOR／NVS 模擬及既有按鍵邏輯測試，不接 USB、不輸入文字。
+
+## v8 歷史驗證摘要
 
 2026-10-14，`macro-studio-v8`：ESP-IDF 5.5.0／PlatformIO 6.2.0 編譯通過，app image 1,095,648 bytes；4 個產物及 64 個來源雜湊見 `firmware/artifacts/keyboard/manifest.json`。同日已完成一塊 PCB2 實板更新；以下分開記錄本版實機證據與下方 v7 歷史結果。
 

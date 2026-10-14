@@ -40,7 +40,7 @@ def studio_html(ui, extra):
     diagnostic = mic[start:end]; mic = mic[:start] + mic[end:]
     channel = mic.index('<label class="field-label" for="mic-channel">')
     mic = mic[:channel] + '<details class="advanced-mic"><summary>進階收音診斷</summary>' + diagnostic + mic[channel:].replace('</section>', '</details></section>')
-    sound = sound.replace('<div class="custom-sound">', '<details class="custom-sound"><summary>使用自己的聲音</summary><div>')
+    sound = sound.replace('<div class="custom-sound">', '<details class="custom-sound"><summary>替每顆鍵上傳音效</summary><div>')
     sound = sound.replace('\n      </div>\n    </section>', '\n      </div></details>\n    </section>')
     recording = recording.replace('<div class="sd-audio-files">', '<details class="sd-audio-files"><summary>SD 卡檔案與儲存狀態</summary><div>')
     recording = recording.replace('\n    </section>', '</details>\n    </section>')
@@ -69,7 +69,7 @@ def build(output, base_path="pcb2"):
         (destination / name).write_bytes(source.read_bytes())
     (output / "_headers").write_text('/' + base_path + '/*\n  Permissions-Policy: serial=(self)\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Content-Security-Policy: default-src \'self\'; script-src \'self\' https://static.cloudflareinsights.com; style-src \'self\' \'unsafe-inline\'; media-src \'self\' blob:; img-src \'self\' data:; connect-src \'self\' https://cloudflareinsights.com; object-src \'none\'; base-uri \'self\'; frame-ancestors \'none\'\n', encoding="utf-8", newline="\n")
     metadata = {"source":"firmware/keyboard/main/web", "base_path":"/" + base_path + "/",
-                "studio_version":5,
+                "studio_version":6,
                 "ui_sha256":{name:hashlib.sha256((ui / name).read_bytes()).hexdigest() for name in ("index.html", "app.js", "style.css")}}
     (destination / "build-info.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8", newline="\n")
     return destination

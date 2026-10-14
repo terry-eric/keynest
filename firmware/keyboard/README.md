@@ -2,7 +2,7 @@
 
 這個應用使用專案的 `pcb2_board` component，整合 USB HID 鍵盤、四顆 RGB LED、自訂按鍵音、麥克風音量與 WAV 錄音。Web App 直接放在韌體中，由 ESP32-S3 提供；連到裝置 Wi-Fi 即可操作，無需網際網路或 SD 卡。
 
-最新 `macro-studio-v8` 加入獨立 NVS 文字／多鍵／巨集設定與按下事件。新版工作介面在[公開控制台](https://demo.terry878.org/pcb2/)及[桌面工具](../../web-console/COMPANION.md)，裝置內建 Wi-Fi 頁面仍保留既有音效／收音介面。普通 HID 快捷鍵獨立運作；中文和多步巨集需要工具。v8 已完成一塊實板的燒錄、校驗及巨集 API 讀取，實體輸入尚未測試，詳見 [VALIDATION.md](VALIDATION.md)。
+最新 `keypad-studio-v9` 加入每鍵獨立音檔、平滑混音限制及 10 分鐘瀏覽器／SD 錄音；保留獨立 NVS 文字／多鍵／巨集設定與按下事件。新版工作介面在[公開控制台](https://demo.terry878.org/pcb2/)及[桌面工具](../../web-console/COMPANION.md)，裝置內建 Wi-Fi 頁面仍保留既有音效／收音介面。普通 HID 快捷鍵獨立運作；中文和多步巨集需要工具。v8 已完成一塊實板的燒錄、校驗及巨集 API 讀取，實體輸入尚未測試，詳見 [VALIDATION.md](VALIDATION.md)。
 
 目前已完成 ESP-IDF 5.5.0 交叉編譯與軟體驗證。2026-10-13 USB 診斷版已燒錄並核對，實測網頁控制、左右 slot 切換、即時 PCM 波形與免 SD 的 WAV 串流；人聲收音品質尚未通過。實機結果見 [VALIDATION.md](VALIDATION.md)。接腳沿用 2026-09-19 EasyEDA 保存快照，詳細對照見 [board library](../README.md)。
 
@@ -116,11 +116,11 @@ python tools/preview-keypad.py --wifi-ssid PCB2-Keypad-XXXX --restore-profile OR
 
 | 目的地 | 預設上限 | 保存方式 | 無 SD 卡可用 |
 |---|---:|---|---|
-| 瀏覽器（預設） | 60 秒 | USB 或 Wi-Fi 傳送 PCM，在瀏覽器組成 WAV，再下載到手機／電腦 | 是 |
+| 瀏覽器（預設） | 10 分鐘 | USB 或 Wi-Fi 傳送 PCM，在瀏覽器組成 WAV，再下載到手機／電腦 | 是 |
 | 內建 Flash | 2.048 秒 | 先錄入 64 KiB RAM；停止後保存裝置最新一段，重開機後可下載 | 是 |
-| microSD（選用） | 60 秒 | 建立 `REC00001.WAV` 等新檔，不覆蓋既有檔案 | 否 |
+| microSD（選用） | 10 分鐘 | 建立 `REC00001.WAV` 等新檔，不覆蓋既有檔案 | 否 |
 
-瀏覽器與 SD 的上限可由 `CONFIG_PCB2_RECORD_SECONDS` 調成 10–300 秒。Flash 的 RAM 限制固定為 32,768 個樣本，實機已確認 2 MB Quad PSRAM，錄音緩衝優先使用 PSRAM，沒有可用 PSRAM 時回退至內部 RAM。
+瀏覽器與 SD 的上限可由 `CONFIG_PCB2_RECORD_SECONDS` 調成 10–600 秒。Flash 的 RAM 限制固定為 32,768 個樣本，實機已確認 2 MB Quad PSRAM，錄音緩衝優先使用 PSRAM，沒有可用 PSRAM 時回退至內部 RAM。
 
 **EEPROM／NVS 適合按鍵與效果設定；音訊由獨立 Flash partition 保存。** 現有硬體證據沒有額外 EEPROM，因此沒有假設存在未接線的晶片。
 
@@ -144,9 +144,13 @@ python tools/preview-keypad.py --wifi-ssid PCB2-Keypad-XXXX --restore-profile OR
 
 ## 自訂按鍵音
 
-可在網頁上傳瀏覽器可解碼的 WAV／MP3 等音檔（來源檔最多 20 MB），或使用最新的瀏覽器／Flash／SD 錄音。音檔在瀏覽器本機解碼，選起點與最多 2 秒的片段，再轉為 16 kHz mono PCM16；可選去除直流偏移後正規化。保存後四鍵共用此片段，選「自訂音效」及「保存到裝置」可保留設定。
+可在網頁上傳瀏覽器可解碼的 WAV／MP3 等音檔（來源檔最多 20 MB），或使用最新的瀏覽器／Flash／SD 錄音。音檔在瀏覽器本機解碼，選起點與最多 2 秒的片段，再轉為 16 kHz mono PCM16；可選去除直流偏移後正規化。先選第 1～4 顆鍵，可分別保存片段；共用音效供未另設聲音的鍵使用。選檔與裁切後可先在電腦試聽，保存時自動選用自訂音效。每顆鍵也能恢復使用共用音效。
 
-Flash 自訂音效使用新增的 `key_sound` partition：`0x250000`、`0x40000`，雙 slot／CRC／最後提交 metadata；原 NVS、factory app、recording partition 位址不變。音效緩衝以 2 KiB 分段配置，優先使用 PSRAM。SD 保存以 exclusive create 建立新的 `KEY00001.WAV`，網頁列出根目錄最多 32 個 REC／KEY WAV（最多掃描 256 個目錄項目），可經 USB 下載。
+Flash 自訂音效使用 `key_sound` partition：起點仍為 `0x250000`，v9 大小改為 `0x140000`，結束於 `0x390000`。前 `0x40000` 保留 v7／v8 的共用音效，後方四組各有兩個 `0x20000` slot，逐鍵 CRC／最後提交 metadata；原 NVS、factory app、recording partition 位址不變。首次更新 v9 必須備份並確認擴充空間未使用，同時更新分割表及 app，不能只寫 app。音效緩衝以 2 KiB 分段配置，優先使用 PSRAM。SD 保存以 exclusive create 建立新的 `KEY00001.WAV`，網頁列出根目錄最多 32 個 REC／KEY WAV（最多掃描 256 個目錄項目），可經 USB 下載。
+
+`POST /api/sound/begin` 新增可選 `key`（整數 0～3），省略時沿用共用音效；`POST /api/sound/default` 接受 `{ "key": 0 }` 恢復該鍵共用音效。`custom_sound.per_key` 表示分割區是否支援，`custom_sound.keys[4]` 回報每鍵實際音效、來源及 CRC。舊分割表仍可開機及上傳共用音效，但會拒絕個別鍵上傳。
+
+合成聲與自訂聲均以 32-bit 累加，最後才進入同一音量限制器：上限 28000 PCM16、立即降低增益、約 50 ms 釋放。低音量訊號不變，多鍵結束時不會立刻跳回最大音量。實際喇叭音質仍需聽感確認。
 
 USB 上傳逐區塊核對 CRC，再核對完整音效。相同 owner／內容的 begin、chunk、commit 可安全重送；代理工具最多重送 5 次暫時連線或裝置 CRC 錯誤。不同內容的重複區塊會拒絕。實機曾出現間歇區塊 CRC 錯誤，原因仍待排查；重送沒有取消完整檔案校驗。
 

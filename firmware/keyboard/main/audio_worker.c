@@ -19,7 +19,8 @@ esp_err_t audio_trigger(unsigned key, unsigned effect) {
 static void worker(void *unused) {
     (void)unused;
     keypad_voice_t voices[4] = {0};
-    int32_t mic[128]; int16_t speaker[128], capture[128];
+    int32_t mic[128], mix[128]; int16_t speaker[128], capture[128];
+    keypad_limiter_t limiter={.gain=65536};
     double sum = 0; size_t measured = 0; float peak = 0;
     unsigned decimation = 0; int32_t average = 0;
     for (;;) {
@@ -40,14 +41,15 @@ static void worker(void *unused) {
             capture[i] = logic_mic_pcm16(mic[i], config.mic_gain);
             float value = capture[i] / 32768.0f;
             sum += value * value; ++measured; peak = fmaxf(peak, fabsf(value));
-            speaker[i] = logic_sound_sample(voices, config.volume);
+            mix[i] = logic_sound_sample(voices, config.volume);
             average += capture[i];
             if (++decimation == 3) {
                 recording[recording_count++] = average / 3;
                 average = 0; decimation = 0;
             }
         }
-        key_sound_mix(speaker, count, config.volume);
+        key_sound_mix(mix, count, config.volume);
+        for(size_t i=0;i<count;++i)speaker[i]=logic_limit_sample(&limiter,mix[i]);
         if (recording_count) {
             mic_monitor_feed(recording, recording_count);
             recorder_feed(recording, recording_count);

@@ -7,6 +7,6 @@ menu "PCB2 Keypad"
         default "pcb2play"
     config PCB2_RECORD_SECONDS
         int "Maximum duration of one WAV recording"
-        range 10 300
-        default 60
+        range 10 600
+        default 600
 endmenu
