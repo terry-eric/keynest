@@ -4,7 +4,7 @@
 
 維持 `firmware/keyboard/main/web/app.js` 的音效、錄音與普通快捷鍵行為，建置時重用其功能面板與 control IDs；新的 `studio.js` 負責分頁、快捷鍵擷取與巨集編輯。v8 加入獨立 NVS 巨集保存和實體鍵事件，不改分割區、原設定 blob、Flash 錄音或按鍵音儲存區。
 
-網址：`https://demo.terry878.org/pcb2/`。Cloudflare Worker 僅服務 `/pcb2` 與 `/pcb2/*`，保留同網域的 `/roomly`、`/trip`。
+網址：[GitHub Pages](https://terry-eric.github.io/pcb2-esp32s3-keypad/) 與 [Cloudflare](https://demo.terry878.org/pcb2/)，兩者使用同一套控制介面。Cloudflare Worker 僅服務 `/pcb2` 與 `/pcb2/*`，保留同網域的 `/roomly`、`/trip`。
 
 使用電腦版 Chrome 或 Edge，以 USB 資料線連接已燒錄支援 PCB2 RPC 的板子。第一次按「連接鍵盤」，授權執行中 VID 303A／PID 4005 的裝置。之後可手動選擇已授權裝置，或自動連接唯一的已授權裝置；多個候選不會任意選擇。ROM PID 1001 不用於控制。正式控制台只有 Web Serial 直連，不提供本機工具／另一個控制台的切換入口，也不載入 companion.js。
 
@@ -50,3 +50,11 @@ Windows 未提供在所有軟體通用的免工具中文字串輸入方法；本
 HID 使用 report 1：8 個修飾鍵與 224-bit NKRO bitmap；report 2：6 個媒體鍵位元，同時組合最多 16 鍵不再截為 6 鍵。改為 report protocol，沒有 BIOS／UEFI boot-keyboard 相容承諾。步驟按下與放開各至少 30ms，只有 TinyUSB 接受 keyboard／consumer report 後才開始計時。按住實體鍵不重複觸發；每次執行使用獨立 program snapshot。一次執行一個巨集，忙碌時其他巨集按下會略過並計數，不排隊；普通實體按鍵中止當前巨集，避免修飾鍵混入文字。USB 斷線／暫停、2 秒無法提交 HID 或執行超過 180 秒時取消，不在重連後補送。
 
 `/api/state.macros` 保留 version 1 與 enabled，新增 `execution:"device"`、busy、completed、failed、dropped、last_key、result。舊 host／ack lease API 回覆 invalid state，event API 無事件，避免舊背景程式重複輸入。網頁 `/api/trigger` 仍然只測試 LED／音效，不能遠端觸發電腦輸入。NVS namespace、設定 blob、Flash 錄音、每鍵音效與 v9 分割表不變；從 v9 只更新 0x10000 app。
+
+## GitHub Pages 發布
+
+`.github/workflows/pages.yml` 在 main 的介面或部署來源更新時，自動檢查、建置並發布同一套 USB 控制台，也能在 Actions 手動執行。網站直接開在 repository 路徑，不用再加 `/pcb2/`；所有 CSS／JavaScript 使用相對網址。建置與部署由 GitHub 執行，日常操作不需本機服務。
+
+部署只上傳 `.tools/github-pages/pcb2-esp32s3-keypad/` 的 10 個公開檔案，不包含專案來源、韌體備份或錄音。Cloudflare 的路由與自訂網域不變；不為 GitHub Pages 設定 CNAME。公開網站的 `/api/*` 都轉成瀏覽器 USB RPC，不需要 GitHub 伺服器提供 API。
+
+GitHub Pages 與 Cloudflare 是不同網站，USB 授權依網站分開。第一次使用 Pages 時，請先在原網站按「連線設定 → 鍵盤沒有出現？→ 中斷連接」，再在 Pages 按「連接鍵盤」授權同一塊板子。不要同時開兩邊連接 USB。

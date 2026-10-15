@@ -8,7 +8,7 @@
 - ZTS6672 麥克風即時音量、PCM 波形、直流偏移診斷、數位增益與 WAV 錄音；可選 ICS-43434 建置設定。
 - Web App 由雲端網站提供，瀏覽器直接透過 USB 設定板子，日常不用本機背景工具；亦保留裝置 Wi-Fi 頁面。
 
-公開的 [鍵盤控制台](https://demo.terry878.org/pcb2/) 以選鍵、設定動作、儲存為入口，燈光音效與收音錄音分頁操作。電腦版 Chrome／Edge 可直接連接 USB；普通快捷鍵支援按下擷取與常用預設。錄音與控制資料在瀏覽器與 PCB 之間傳送；詳見 [網頁 USB 控制台](web-console/README.md)。
+公開的 [GitHub Pages 控制台](https://terry-eric.github.io/pcb2-esp32s3-keypad/) 與 [Cloudflare 控制台](https://demo.terry878.org/pcb2/) 以選鍵、設定動作、儲存為入口，燈光音效與收音錄音分頁操作。電腦版 Chrome／Edge 可直接連接 USB；普通快捷鍵支援按下擷取與常用預設。錄音與控制資料在瀏覽器與 PCB 之間傳送；詳見 [網頁 USB 控制台](web-console/README.md)。
 
 v10 改為單一[雲端控制台](https://demo.terry878.org/pcb2/)透過 USB 設定板子，不需安裝或啟動本機背景工具。快捷鍵、最多 16 鍵的組合、媒體鍵、英文文字和 16 步巨集由 ESP32-S3 自行執行，設定保存後可關閉網站。中文依系統輸入方式提供 Linux／macOS 選項；Windows 尚無適用所有軟體的免工具中文模式，詳見[文字輸入限制](firmware/keyboard/README.md#v10-免背景工具的文字與巨集)。每鍵音效、平滑混音與 10 分鐘錄音沿用 v9。
 

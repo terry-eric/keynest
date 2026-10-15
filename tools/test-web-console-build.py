@@ -30,10 +30,24 @@ with tempfile.TemporaryDirectory(prefix="pcb2-web-build-", dir=cache) as tempora
     assert 'id="page-keys"' in html and 'id="page-effects"' in html and 'id="page-audio"' in html
     assert html.count('data-edit-key=')==4 and html.count('data-trigger=')==4
     assert "serial=(self)" in (Path(temporary) / "_headers").read_text(encoding="utf-8")
+    # GitHub Pages mounts the artifact directly at the repository URL, not /pcb2/.
+    import json
+    from urllib.parse import urljoin
+    pages = module.build(Path(temporary), "pcb2-esp32s3-keypad")
+    pages_html = (pages / "index.html").read_text(encoding="utf-8")
+    assert pages_html == html
+    assert {p.name for p in pages.iterdir()} == files
+    for name in files - {"build-info.json"}:
+        assert (pages / name).read_bytes() == (destination / name).read_bytes(), name
+    assert json.loads((pages / "build-info.json").read_text())["base_path"] == "/pcb2-esp32s3-keypad/"
+    page_url = "https://terry-eric.github.io/pcb2-esp32s3-keypad/"
+    for asset in re.findall(r'(?:src|href)="(\./[^"?]+)"', pages_html):
+        assert (pages / asset[2:]).is_file(), asset
+        assert urljoin(page_url, asset).startswith(page_url)
     for invalid in ("../outside", "/", "", "pcb2/../outside"):
         try:
             module.build(Path(temporary), invalid)
             raise AssertionError("Unsafe base path accepted")
         except ValueError:
             pass
-print("PASS: maintained behavior, preserved control IDs, three task pages, edit/test separation, asset allowlist and safe paths")
+print("PASS: maintained controls, Cloudflare/Pages identical assets, repository-relative links, asset allowlist and safe paths")
