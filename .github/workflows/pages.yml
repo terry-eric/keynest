@@ -1,4 +1,4 @@
-name: Deploy keyboard console to GitHub Pages
+name: Deploy KeyNest to GitHub Pages
 
 on:
   push:
@@ -9,6 +9,7 @@ on:
       - firmware/keyboard/main/web/**
       - tools/build-web-console.py
       - tools/test-web-console-build.py
+      - tools/test-actions.cjs
       - tools/test-studio.cjs
       - tools/test-connection-view.cjs
       - tools/test-web-serial.cjs
@@ -37,15 +38,16 @@ jobs:
       - name: Check the maintained console
         run: |
           python tools/test-web-console-build.py
+          node tools/test-actions.cjs
           node tools/test-studio.cjs
           node tools/test-connection-view.cjs
           node tools/test-web-serial.cjs
       - name: Build the same USB console for the repository URL
-        run: python tools/build-web-console.py --out .tools/github-pages --base-path pcb2-esp32s3-keypad
+        run: python tools/build-web-console.py --out .tools/github-pages --base-path keynest
       - name: Upload only the public console assets
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
-          path: .tools/github-pages/pcb2-esp32s3-keypad
+          path: .tools/github-pages/keynest
 
   deploy:
     needs: build

@@ -59,6 +59,10 @@ esp_err_t esp_read_mac(uint8_t*,int);
     (temp/'tinyusb.h').write_text(common)
     for name in ['tusb_cdc_acm.h','tusb_console.h','esp_mac.h']:(temp/name).write_text('#include "tinyusb.h"\n')
     binary=temp/'test.exe'
-    sources=['tools/test-usb-macro.c','firmware/keyboard/main/usb_keyboard.c','firmware/keyboard/main/macro_engine.c']
+    sources=['tools/test-usb-macro.c','firmware/keyboard/main/usb_keyboard.c','firmware/keyboard/main/macro_engine.c','firmware/keyboard/main/key_gestures.c']
     subprocess.run([str(TCC),'-DCJSON_HIDE_SYMBOLS','-D__cdecl=','-D__stdcall=','-I'+str(temp),'-I'+str(CJSON),'-I'+str(ROOT/'firmware/keyboard/main'),*[str(ROOT/s) for s in sources],str(CJSON/'cJSON.c'),'-o',str(binary)],check=True)
     subprocess.run([str(binary)],check=True)
+
+    gesture_binary=temp/'gestures.exe'
+    subprocess.run([str(TCC),'-I'+str(ROOT/'firmware/keyboard/main'),str(ROOT/'tools/test-key-gestures.c'),str(ROOT/'firmware/keyboard/main/key_gestures.c'),'-o',str(gesture_binary)],check=True)
+    subprocess.run([str(gesture_binary)],check=True)

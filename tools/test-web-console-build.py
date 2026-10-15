@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix="pcb2-web-build-", dir=cache) as tempora
     assert html.index('src="./usb-serial.js"') < html.index('src="./usb-connect.js"') < html.index('src="./app.js"')
     assert 'id="mic-waveform"' in html and 'id="sound-upload"' in html and 'id="serial-choose"' in html
     files = {p.name for p in destination.iterdir()}
-    assert files == {"index.html", "app.js", "style.css", "usb-serial.js", "usb-connect.js", "usb-connect.css", "studio.js", "studio.css", "build-info.json", "gsap.min.js"}
+    assert files == {"index.html", "app.js", "style.css", "usb-serial.js", "usb-connect.js", "usb-connect.css", "studio.js", "studio.css", "actions.js", "build-info.json", "gsap.min.js"}
     assert "127.0.0.1" not in html and "companion.js" not in html, "Production must use one cloud console"
     import re
     ids=re.findall(r'\bid="([^"]+)"',html)
@@ -33,14 +33,16 @@ with tempfile.TemporaryDirectory(prefix="pcb2-web-build-", dir=cache) as tempora
     # GitHub Pages mounts the artifact directly at the repository URL, not /pcb2/.
     import json
     from urllib.parse import urljoin
-    pages = module.build(Path(temporary), "pcb2-esp32s3-keypad")
+    pages = module.build(Path(temporary), "keynest")
     pages_html = (pages / "index.html").read_text(encoding="utf-8")
     assert pages_html == html
     assert {p.name for p in pages.iterdir()} == files
     for name in files - {"build-info.json"}:
         assert (pages / name).read_bytes() == (destination / name).read_bytes(), name
-    assert json.loads((pages / "build-info.json").read_text())["base_path"] == "/pcb2-esp32s3-keypad/"
-    page_url = "https://terry-eric.github.io/pcb2-esp32s3-keypad/"
+    assert json.loads((pages / "build-info.json").read_text())["base_path"] == "/keynest/"
+    headers = (Path(temporary) / "_headers").read_text()
+    assert '/pcb2/*' in headers and '/keynest/*' in headers
+    page_url = "https://terry-eric.github.io/keynest/"
     for asset in re.findall(r'(?:src|href)="(\./[^"?]+)"', pages_html):
         assert (pages / asset[2:]).is_file(), asset
         assert urljoin(page_url, asset).startswith(page_url)

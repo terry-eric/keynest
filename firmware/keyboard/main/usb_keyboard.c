@@ -2,6 +2,7 @@
 #include "app_api.h"
 #include "macro_store.h"
 #include "macro_engine.h"
+#include "key_gestures.h"
 #include "device_control.h"
 #include "tinyusb.h"
 #include "tusb_cdc_acm.h"
@@ -63,17 +64,29 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
 }
 bool usb_keyboard_connected(void) { return tud_mounted(); }
 void usb_keyboard_tick(uint8_t down, const keypad_config_t *config) {
-    static uint8_t previous;
-    if (!tud_mounted() || tud_suspended()) { if(running)finish("disconnected");last_valid=false;previous=down;return; }
-    uint8_t macros = macro_store_mask(), pressed = down & ~previous;
-    previous = down;
+    static key_gestures_t gestures;
+    static uint32_t last_revision;
+    static bool configured;
+    uint16_t hold[4],twice[4];uint32_t revision=macro_store_gestures(hold,twice);
+    if (!tud_mounted() || tud_suspended()) { if(running)finish("disconnected");last_valid=false;key_gestures_reset(&gestures,down);return; }
+    if(configured && revision!=last_revision){key_gestures_reset(&gestures,down);}
+    configured=true;last_revision=revision;
+    uint8_t macros = macro_store_mask(), events[4];
     uint64_t now = esp_timer_get_time() / 1000;
+    key_gestures_tick(&gestures,down,now,hold,twice,events);
     uint8_t manual=down & ~macros;
+    if(manual)key_gestures_reset(&gestures,down);
     bool cancelled=false;
     if(running && (manual || now-started>180000)){finish(manual?"interrupted":"timeout");cancelled=true;}
-    for(unsigned i=0;i<4;i++)if(pressed & macros & (1U<<i)){
+    for(unsigned i=0;i<4;i++)if(events[i] && (macros & (1U<<i))){
         if(running || manual || cancelled || release_pending){macro_store_execution(!!running,i,"busy");continue;}
         cJSON *p=macro_store_get(i);if(!p)continue;
+        if(events[i]!=KEY_GESTURE_TAP){
+            const cJSON *g=cJSON_GetObjectItemCaseSensitive(p,"gestures");
+            cJSON *chosen=cJSON_Duplicate(cJSON_GetObjectItemCaseSensitive(g,events[i]==KEY_GESTURE_HOLD?"hold":"double"),true);
+            cJSON_Delete(p);p=chosen;if(!cJSON_IsObject(p)){cJSON_Delete(p);continue;}
+        }
+        if(!cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(p,"steps"))){cJSON_Delete(p);continue;}
         const char *error=macro_engine_start(&engine,p);
         if(error){cJSON_Delete(p);macro_store_execution(false,i,error);continue;}
         running=p;running_key=i;started=now;frame_accepted=true;frame_at=now;frame_hold=0;

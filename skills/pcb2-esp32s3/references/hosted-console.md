@@ -1,8 +1,8 @@
 # 公開控制台與瀏覽器 USB
 
-`web-console/` 與 `tools/build-web-console.py` 重用 firmware 的功能面板／control IDs 與完整 app.js，產生 `dist-web/pcb2/`。`studio.html`／`studio.css`／`studio.js` 提供三個工作分頁、點鍵編輯、快捷鍵擷取與巨集編輯；原始 app.js 透過函式參數呼叫動態 transport。修改來源後重新建置，不手動維護 dist 副本。
+`web-console/` 與 `tools/build-web-console.py` 重用 firmware 的功能面板／control IDs 與完整 app.js，產生 `dist-web/keynest/` 與相容的 `dist-web/pcb2/`。`studio.html`／`studio.css`／`studio.js` 提供四個工作分頁、點鍵編輯、快捷鍵擷取與巨集編輯；原始 app.js 透過函式參數呼叫動態 transport。修改來源後重新建置，不手動維護 dist 副本。
 
-正式網址 `https://demo.terry878.org/pcb2/`，Cloudflare Worker `pcb2-keypad-console` 的 `wrangler.jsonc` 只使用 `/pcb2` 與 `/pcb2/*` 路由；同網域有 Roomly 與 Trip 服務，不要為此任務改它們的路由或覆寫整個網域。
+正式網址 `https://demo.terry878.org/keynest/`，Cloudflare Worker `pcb2-keypad-console` 的 `wrangler.jsonc` 使用 `/keynest` 與 `/keynest/*`，另保留 `/pcb2` 舊入口；同網域有 Roomly 與 Trip 服務，不要為此任務改它們的路由或覆寫整個網域。
 
 Web Serial 需要 HTTPS／localhost 與支援的桌面瀏覽器。首次 `requestPort()` 必須由使用者操作；`getPorts()` 只能取得這個網站已授權的裝置。自動連接只用唯一的 VID 303A／PID 4005 候選，再以 PCB2 state／protocol handshake 核對。多個候選由使用者選擇，不透過瀏覽器內部 API 繞過授權。
 
@@ -25,3 +25,7 @@ USB CDC 使用 115200 baud、DTR true、RTS false。保持 RPC id／protocol、P
 ## v10 現行：板上執行
 
 使用單一公開 Web Serial 控制台，不啟動本機 companion。所有實體巨集由 macro_engine.c 與 usb_keyboard.c 執行；host lease API 已停用，避免重複輸入。舊 program 保留，新增選填 text_mode（ascii／linux／macos）；中文須配合系統輸入來源，Windows 尚無通用免工具模式，macOS 暫只支援 BMP。不要假稱跨平台實測通過。詳見 firmware/keyboard/README.md 的 v10 規範。執行 test-macro-store.py、test-usb-macro.py、test-studio.cjs 及連線／Web Serial／公開建置測試。更新 v9 板子只寫 app，完整保存 NVS 與音訊。
+
+## v11 特殊按法與 KeyNest
+
+KeyNest 使用 actions.js 的總表與單鍵映射，四分頁包含獨立動作總表。長按與雙擊儲存在 program 的 gestures，先核對 macros.gestures===1；沒有該能力不可假稱可用。未啟用時保留獨立 Ctrl／A 的 raw 按住語意，啟用後是點按動作且短按有判定延遲。參數、1200-byte 共用上限與協定見 firmware/keyboard/README.md。維持 key_gestures.c、store、USB scheduler 與 JS 的測試一致。

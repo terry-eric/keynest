@@ -11,6 +11,8 @@
 static SemaphoreHandle_t lock, storage_lock;
 static char programs[4][MACRO_PROGRAM_BYTES + 1];
 static uint8_t enabled;
+static uint32_t revision;
+static uint16_t holds[4], doubles[4];
 static unsigned drops;
 static bool device_busy;
 static unsigned completed, failed, device_key;
@@ -65,10 +67,22 @@ static bool key_name(const char *s) {
     for (unsigned i = 0; i < sizeof(names) / sizeof(names[0]); ++i) if (!strcmp(s, names[i])) return true;
     return false;
 }
-bool macro_program_valid(const cJSON *p) {
+static bool program_valid(const cJSON *p, bool allow_gestures) {
     const char *const top[] = {"name","steps"}, *const extended[] = {"name","steps","text_mode"};
     const cJSON *mode=cJSON_GetObjectItemCaseSensitive(p,"text_mode");
-    if (!fields(p, top, 2) && !fields(p, extended, 3)) return false;
+    const char *const gesture_top[] = {"name","steps","gestures"}, *const gesture_extended[] = {"name","steps","text_mode","gestures"};
+    const cJSON *gestures=cJSON_GetObjectItemCaseSensitive(p,"gestures");
+    if (!fields(p, top, 2) && !fields(p, extended, 3) &&
+        !(allow_gestures && (fields(p,gesture_top,3) || fields(p,gesture_extended,4)))) return false;
+    if(gestures){
+        const char *const names[]={"hold_ms","double_ms","hold","double"};
+        const cJSON *hold=cJSON_GetObjectItemCaseSensitive(gestures,"hold"),*twice=cJSON_GetObjectItemCaseSensitive(gestures,"double");
+        const cJSON *hms=cJSON_GetObjectItemCaseSensitive(gestures,"hold_ms"),*dms=cJSON_GetObjectItemCaseSensitive(gestures,"double_ms");
+        if(!allow_gestures || !fields(gestures,names,4) || !integer(hms,2000) || hms->valuedouble<300 || !integer(dms,600) || dms->valuedouble<150) return false;
+        if((!cJSON_IsNull(hold) && !program_valid(hold,false)) || (!cJSON_IsNull(twice) && !program_valid(twice,false)))return false;
+        if((!cJSON_IsNull(hold) && !cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(hold,"steps"))) ||
+           (!cJSON_IsNull(twice) && !cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(twice,"steps"))) || (cJSON_IsNull(hold) && cJSON_IsNull(twice))) return false;
+    }
     if(mode && (!cJSON_IsString(mode) || (strcmp(mode->valuestring,"ascii") && strcmp(mode->valuestring,"linux") && strcmp(mode->valuestring,"macos"))))return false;
     const cJSON *name = cJSON_GetObjectItemCaseSensitive(p, "name"), *steps = cJSON_GetObjectItemCaseSensitive(p, "steps");
     if (!cJSON_IsString(name) || !utf8(name->valuestring, 64) || !cJSON_IsArray(steps) || cJSON_GetArraySize(steps) > MACRO_STEPS) return false;
@@ -85,6 +99,10 @@ bool macro_program_valid(const cJSON *p) {
                 for (const cJSON *other = key->next; other; other = other->next)
                     if (cJSON_IsString(other) && !strcmp(key->valuestring, other->valuestring)) return false;
             }
+        } else if (!strcmp(type->valuestring,"hid")) {
+            const char *const names[]={"type","code","modifiers"};
+            const cJSON *code=cJSON_GetObjectItemCaseSensitive(step,"code"), *mods=cJSON_GetObjectItemCaseSensitive(step,"modifiers");
+            if(!fields(step,names,3) || !integer(code,115) || (code->valuedouble>0 && code->valuedouble<4) || !integer(mods,255))return false;
         } else if (!strcmp(type->valuestring, "text")) {
             const char *const names[] = {"type","text"}; const cJSON *text = cJSON_GetObjectItemCaseSensitive(step, "text");
             if (!fields(step, names, 2) || !cJSON_IsString(text) || !*text->valuestring || !utf8(text->valuestring, 512)) return false;
@@ -98,6 +116,21 @@ bool macro_program_valid(const cJSON *p) {
     char *raw = cJSON_PrintUnformatted(p); if (!raw) return false;
     bool valid = strlen(raw) <= MACRO_PROGRAM_BYTES; free(raw); return valid;
 }
+bool macro_program_valid(const cJSON *p) { return program_valid(p,true); }
+static void update_key(unsigned i,const cJSON *p) {
+    const cJSON *g=cJSON_GetObjectItemCaseSensitive(p,"gestures");
+    holds[i]=doubles[i]=0;
+    if(g){
+        if(!cJSON_IsNull(cJSON_GetObjectItemCaseSensitive(g,"hold")))holds[i]=(uint16_t)cJSON_GetObjectItemCaseSensitive(g,"hold_ms")->valuedouble;
+        if(!cJSON_IsNull(cJSON_GetObjectItemCaseSensitive(g,"double")))doubles[i]=(uint16_t)cJSON_GetObjectItemCaseSensitive(g,"double_ms")->valuedouble;
+    }
+    if(holds[i] || doubles[i] || cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(p,"steps")))enabled|=1U<<i;
+    else enabled&=~(1U<<i);
+    ++revision;
+}
+uint32_t macro_store_gestures(uint16_t hold[4],uint16_t twice[4]) {
+    xSemaphoreTake(lock,portMAX_DELAY);memcpy(hold,holds,sizeof(holds));memcpy(twice,doubles,sizeof(doubles));uint32_t result=revision;xSemaphoreGive(lock);return result;
+}
 esp_err_t macro_store_init(void) {
     lock = xSemaphoreCreateMutex(); storage_lock = xSemaphoreCreateMutex(); if (!lock || !storage_lock) return ESP_ERR_NO_MEM;
     nvs_handle_t handle;
@@ -106,7 +139,7 @@ esp_err_t macro_store_init(void) {
             char key[8]; snprintf(key, sizeof(key), "key%u", i); size_t size = sizeof(programs[i]);
             if (nvs_get_str(handle, key, programs[i], &size) == ESP_OK) {
                 cJSON *p = cJSON_Parse(programs[i]);
-                if (macro_program_valid(p) && cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(p, "steps"))) enabled |= 1U << i;
+                if (macro_program_valid(p)) update_key(i,p);
                 else *programs[i] = 0;
                 cJSON_Delete(p);
             }
@@ -126,7 +159,7 @@ cJSON *macro_store_status(void) {
     xSemaphoreTake(lock, portMAX_DELAY);
     cJSON *p = cJSON_CreateObject();
     if (p) {
-        cJSON_AddNumberToObject(p,"version",1);cJSON_AddStringToObject(p,"execution","device");
+        cJSON_AddNumberToObject(p,"version",1);cJSON_AddNumberToObject(p,"gestures",1);cJSON_AddStringToObject(p,"execution","device");
         cJSON_AddNumberToObject(p,"enabled",enabled);cJSON_AddBoolToObject(p,"host_connected",false);
         cJSON_AddBoolToObject(p,"busy",device_busy);cJSON_AddNumberToObject(p,"dropped",drops);
         cJSON_AddNumberToObject(p,"completed",completed);cJSON_AddNumberToObject(p,"failed",failed);
@@ -152,7 +185,7 @@ esp_err_t macro_store_command(const char *path, cJSON *body) {
         char name[8]; snprintf(name, sizeof(name), "key%u", (unsigned)key->valuedouble);
         xSemaphoreTake(storage_lock, portMAX_DELAY); nvs_handle_t handle; esp_err_t err = nvs_open("pcb2_macros", NVS_READWRITE, &handle);
         if (err == ESP_OK) { err = nvs_set_str(handle, name, raw); if (err == ESP_OK) err = nvs_commit(handle); nvs_close(handle); }
-        if (err == ESP_OK) { xSemaphoreTake(lock, portMAX_DELAY); unsigned i = (unsigned)key->valuedouble; strcpy(programs[i], raw); if (cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(p, "steps"))) enabled |= 1U << i; else enabled &= ~(1U << i); xSemaphoreGive(lock); }
+        if (err == ESP_OK) { xSemaphoreTake(lock, portMAX_DELAY); unsigned i = (unsigned)key->valuedouble; strcpy(programs[i], raw); update_key(i,p); xSemaphoreGive(lock); }
         xSemaphoreGive(storage_lock); free(raw); return err;
     }
     // Old companion tools cannot acquire an execution lease or duplicate device input.

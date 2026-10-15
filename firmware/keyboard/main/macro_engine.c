@@ -77,6 +77,7 @@ bool macro_engine_next(macro_engine_t *e,macro_frame_t *f,unsigned *hold,bool ca
         if(!e->step)return false;
         const cJSON *s=e->step;e->step=s->next;const cJSON *t=get(s,"type");
         if(!strcmp(t->valuestring,"wait")){*hold=(unsigned)get(s,"ms")->valuedouble;return true;}
+        if(!strcmp(t->valuestring,"hid")){f->modifiers=(uint8_t)get(s,"modifiers")->valuedouble;macro_frame_key(f,(uint8_t)get(s,"code")->valuedouble);e->release=true;return true;}
         if(!strcmp(t->valuestring,"text")){e->text=(const unsigned char*)get(s,"text")->valuestring;continue;}
         const cJSON *keys=get(s,"keys");for(const cJSON *k=keys->child;k;k=k->next)named(f,k->valuestring);
         e->release=true;return true;

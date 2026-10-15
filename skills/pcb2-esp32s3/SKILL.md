@@ -9,7 +9,7 @@ description: "開發、更新與診斷 PCB2 四鍵 ESP32-S3 板子的 ESP-IDF �
 
 ## 先定位專案與需求
 
-- 在目前工作區或使用者指定路徑找到 `firmware/components/pcb2_board/include/pcb2_pins.h`、`firmware/keyboard/main/` 與 `tools/preview-keypad.py`。Repository 是 `terry-eric/pcb2-esp32s3-keypad`；不要將技能安裝目錄當成程式工作區，也不要寫死其他電腦的絕對路徑。
+- 在目前工作區或使用者指定路徑找到 `firmware/components/pcb2_board/include/pcb2_pins.h`、`firmware/keyboard/main/` 與 `tools/preview-keypad.py`。Repository 是 `terry-eric/keynest`；不要將技能安裝目錄當成程式工作區，也不要寫死其他電腦的絕對路徑。
 - 讀取適用的 AGENTS.md、Git 狀態、目前 `firmware/artifacts/keyboard/manifest.json` 及 `firmware/keyboard/VALIDATION.md`。下載專案、建置、更新 PCB 與 PCB 設計修改是不同工作；按使用者這次要求執行。
 - 執行下方唯讀 helper 可取得目前接腳、分割區及產物校驗。建置後 manifest 可能未更新，校驗失敗時先辨認過期紀錄或產物差異。
 

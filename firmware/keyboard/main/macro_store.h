@@ -17,3 +17,5 @@ cJSON *macro_store_status(void);
 uint8_t macro_store_mask(void);
 void macro_store_press(unsigned key);
 void macro_store_execution(bool busy, unsigned key, const char *result);
+
+uint32_t macro_store_gestures(uint16_t hold[4], uint16_t twice[4]);

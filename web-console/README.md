@@ -1,10 +1,10 @@
-# PCB2 網頁 USB 控制台
+# KeyNest 網頁 USB 控制台
 
-控制台 v7 以「連接鍵盤 → 設定按鍵 → 儲存變更」為主要流程，分成按鍵、燈光音效、收音錄音三頁。未連線時只顯示簡潔的連接卡片，隱藏尚不可用的鍵盤與編輯器；連線後縮成狀態列，顯示 USB 與文字／巨集是否可用。左側 2×2 鍵帽選擇要編輯的鍵，右側直接選快捷鍵、多鍵組合、輸入文字或連續動作。主要操作只有「儲存到鍵盤」，暫時套用收在更多裝置選項；儲存期間暫停編輯，完成後恢復操作。
+控制台 v9 以「連接鍵盤 → 設定按鍵 → 儲存變更」為主要流程，分成按鍵、動作總表、燈光音效、收音錄音四頁。未連線時只顯示簡潔的連接卡片，隱藏尚不可用的鍵盤與編輯器；連線後縮成狀態列，顯示 USB 與文字／巨集是否可用。左側 2×2 鍵帽選擇要編輯的鍵，右側直接選快捷鍵、多鍵組合、輸入文字或連續動作。主要操作只有「儲存到鍵盤」，暫時套用收在更多裝置選項；儲存期間暫停編輯，完成後恢復操作。
 
 維持 `firmware/keyboard/main/web/app.js` 的音效、錄音與普通快捷鍵行為，建置時重用其功能面板與 control IDs；新的 `studio.js` 負責分頁、快捷鍵擷取與巨集編輯。v8 加入獨立 NVS 巨集保存和實體鍵事件，不改分割區、原設定 blob、Flash 錄音或按鍵音儲存區。
 
-網址：[GitHub Pages](https://terry-eric.github.io/pcb2-esp32s3-keypad/) 與 [Cloudflare](https://demo.terry878.org/pcb2/)，兩者使用同一套控制介面。Cloudflare Worker 僅服務 `/pcb2` 與 `/pcb2/*`，保留同網域的 `/roomly`、`/trip`。
+網址：[GitHub Pages](https://terry-eric.github.io/keynest/) 與 [Cloudflare](https://demo.terry878.org/keynest/)，兩者使用同一套控制介面。Cloudflare Worker 服務 `/keynest`、`/keynest/*`，並保留 `/pcb2` 舊入口，保留同網域的 `/roomly`、`/trip`。
 
 使用電腦版 Chrome 或 Edge，以 USB 資料線連接已燒錄支援 PCB2 RPC 的板子。第一次按「連接鍵盤」，授權執行中 VID 303A／PID 4005 的裝置。之後可手動選擇已授權裝置，或自動連接唯一的已授權裝置；多個候選不會任意選擇。ROM PID 1001 不用於控制。正式控制台只有 Web Serial 直連，不提供本機工具／另一個控制台的切換入口，也不載入 companion.js。
 
@@ -18,6 +18,18 @@
 
 v9 音效頁可選第 1～4 顆鍵，各自上傳／裁切最多 2 秒音檔，先試聽再存到 Flash 或 SD，並可恢復共用音效。瀏覽器及 SD 錄音上限為 10 分鐘；Flash 短錄音仍為 2.048 秒。介面以裝置實際回報上限顯示，舊版韌體不會被誤標為 10 分鐘。
 
+## KeyNest：單鍵、動作總表與更多按法
+
+公開網站已改名 KeyNest，GitHub repository 為 `terry-eric/keynest`，Pages 網址為 <https://terry-eric.github.io/keynest/>，Cloudflare 為 <https://demo.terry878.org/keynest/>。Cloudflare `/pcb2/` 舊入口繼續提供同一套介面；舊的 GitHub Pages 專案網址不會隨 repository 改名自動轉址。
+
+- **單鍵**：可選 A、Enter 或獨立的左右 Ctrl／Shift／Alt／Win。未啟用特殊按法時，按下維持、放開釋放；例如第 1 鍵 Ctrl、第 2 鍵 A，可合成 Ctrl+A。
+- **動作總表**：28 個單鍵、快捷鍵、連續動作範例、Windows 程式與媒體動作。可以搜尋／分類，選第幾顆與短按／長按／雙擊，連續安排多顆，最後一次儲存；離線也能瀏覽。
+- **連續動作範例**：全選並複製、貼上並送出（Enter 可能送出訊息）、常用英文回覆。每一步可編輯。
+- **開啟應用程式**：Windows 的記事本、小算盤、檔案總管，或英文 `.exe` 絕對路徑；空格自動加引號。使用 Win+R → 等待 → 選取舊內容 → 輸入路徑 → Enter，需要美式英文輸入，沒有背景程式。網站儲存不會啟動程式，須按實體鍵。
+- **v11 特殊按法**：每鍵可另設長按及連按兩下，長按 300–2000ms（預設 600），雙擊間隔 150–600ms（預設 300）。短按放開後執行；啟用雙擊時再等判定間隔。長按只執行一次，不會同時送出短按或雙擊。啟用後這顆鍵改為點按動作，不再當按住的修飾鍵；需要分開 Ctrl+A 時保持特殊按法關閉。
+
+長按／雙擊可選總表動作、自訂按鍵組合與文字，或複製上方已編輯的多步巨集／自訂程式路徑。三種按法合計仍須在每鍵 1200 UTF-8 bytes 內。舊 v10 板子仍可用一般單鍵／巨集，但網站會阻止把特殊按法儲存到不支援的韌體。
+
 ## 建置與部署
 
 ```powershell
@@ -26,6 +38,7 @@ node tools/test-web-serial.cjs
 node tools/test-keypad-web.cjs
 node tools/test-custom-sound-web.cjs
 node tools/test-studio.cjs
+node tools/test-actions.cjs
 node tools/test-connection-view.cjs
 python tools/test-web-console-build.py
 python tools/test-macro-store.py
@@ -55,6 +68,6 @@ HID 使用 report 1：8 個修飾鍵與 224-bit NKRO bitmap；report 2：6 個�
 
 `.github/workflows/pages.yml` 在 main 的介面或部署來源更新時，自動檢查、建置並發布同一套 USB 控制台，也能在 Actions 手動執行。網站直接開在 repository 路徑，不用再加 `/pcb2/`；所有 CSS／JavaScript 使用相對網址。建置與部署由 GitHub 執行，日常操作不需本機服務。
 
-部署只上傳 `.tools/github-pages/pcb2-esp32s3-keypad/` 的 10 個公開檔案，不包含專案來源、韌體備份或錄音。Cloudflare 的路由與自訂網域不變；不為 GitHub Pages 設定 CNAME。公開網站的 `/api/*` 都轉成瀏覽器 USB RPC，不需要 GitHub 伺服器提供 API。
+部署只上傳 `.tools/github-pages/keynest/` 的 11 個公開檔案，不包含專案來源、韌體備份或錄音。Cloudflare 的路由與自訂網域不變；不為 GitHub Pages 設定 CNAME。公開網站的 `/api/*` 都轉成瀏覽器 USB RPC，不需要 GitHub 伺服器提供 API。
 
 GitHub Pages 與 Cloudflare 是不同網站，USB 授權依網站分開。第一次使用 Pages 時，請先在原網站按「連線設定 → 鍵盤沒有出現？→ 中斷連接」，再在 Pages 按「連接鍵盤」授權同一塊板子。不要同時開兩邊連接 USB。

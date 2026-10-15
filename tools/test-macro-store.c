@@ -38,5 +38,17 @@ int main(void){
  fail_write=1;assert(command("/api/macro","{\"key\":0,\"program\":{\"name\":\"\",\"steps\":[]}}")!=0);assert(macro_store_mask()==1);
  fail_write=0;assert(command("/api/macro","{\"key\":0,\"program\":{\"name\":\"\",\"steps\":[]}}") ==0);assert(macro_store_mask()==0);
  assert(cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(snapshot,"steps"))==2);cJSON_Delete(snapshot);
+ const char *gesture="{\"key\":2,\"program\":{\"name\":\"\",\"steps\":[{\"type\":\"hid\",\"code\":4,\"modifiers\":128}],\"gestures\":{\"hold_ms\":600,\"double_ms\":300,\"hold\":{\"name\":\"hold\",\"steps\":[{\"type\":\"keys\",\"keys\":[\"CTRL\",\"A\"]}]},\"double\":null}}}";
+ assert(command("/api/macro",gesture)==0);assert(macro_store_mask()==4);
+ uint16_t h[4],d[4];unsigned rev=macro_store_gestures(h,d);assert(h[2]==600&&d[2]==0&&rev>0);
+ snapshot=macro_store_get(2);assert(macro_program_valid(snapshot));cJSON *g=cJSON_GetObjectItemCaseSensitive(snapshot,"gestures");
+ cJSON_SetNumberValue(cJSON_GetObjectItemCaseSensitive(g,"hold_ms"),299);assert(!macro_program_valid(snapshot));
+ cJSON_SetNumberValue(cJSON_GetObjectItemCaseSensitive(g,"hold_ms"),600);
+ cJSON_SetNumberValue(cJSON_GetObjectItemCaseSensitive(g,"double_ms"),601);assert(!macro_program_valid(snapshot));
+ cJSON_SetNumberValue(cJSON_GetObjectItemCaseSensitive(g,"double_ms"),300);
+ cJSON *nested=cJSON_Duplicate(g,true);cJSON_AddItemToObject(cJSON_GetObjectItemCaseSensitive(g,"hold"),"gestures",nested);assert(!macro_program_valid(snapshot));cJSON_Delete(snapshot);
+ // Reload from the same simulated NVS: gestures and masks survive reboot.
+ assert(macro_store_init()==0);snapshot=macro_store_get(2);assert(macro_program_valid(snapshot));cJSON_Delete(snapshot);
+ assert(macro_store_gestures(h,d)>rev&&h[2]==600&&d[2]==0);
  puts("PASS: C Unicode validation, NVS failures, device execution state, independent running snapshot and disabled legacy host input");return 0;
 }

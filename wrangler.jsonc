@@ -7,6 +7,8 @@
     "not_found_handling": "none"
   },
   "routes": [
+    {"pattern": "demo.terry878.org/keynest", "zone_name": "terry878.org"},
+    {"pattern": "demo.terry878.org/keynest/*", "zone_name": "terry878.org"},
     {"pattern": "demo.terry878.org/pcb2", "zone_name": "terry878.org"},
     {"pattern": "demo.terry878.org/pcb2/*", "zone_name": "terry878.org"}
   ]

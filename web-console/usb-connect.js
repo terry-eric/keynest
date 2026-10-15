@@ -5,8 +5,8 @@ function pcb2ConnectionView({companion=false,connected=false,working=false,state
   const inputIssue=connected&&companion?state?.companion_error||"":"";
   const keyboard=working?"鍵盤：連接中…":connected?"鍵盤：已連接":"鍵盤：未連接";
   const macro=!connected?"文字與巨集：尚未就緒":!version?"文字與巨集：需更新韌體":!onboard?"文字與巨集：需更新韌體":"文字與巨集：板上執行";
-  const title=working?"正在連接你的鍵盤":!supported?"請用 Chrome 或 Edge 開啟":!connected?companion?"接上鍵盤，就能開始設定":"連接你的鍵盤":"PCB2 四鍵鍵盤";
-  const description=companion?connected?"文字與巨集工具正在管理連線。":"用 USB 資料線接上 PCB2，工具會自動找到鍵盤。":supported?"用 USB 資料線接上 PCB2，再按下方按鈕選擇裝置。":"USB 連接需要電腦版 Chrome 或 Edge。也可以先試用介面。";
+  const title=working?"正在連接你的鍵盤":!supported?"請用 Chrome 或 Edge 開啟":!connected?companion?"接上鍵盤，就能開始設定":"連接你的鍵盤":"KeyNest 四鍵鍵盤";
+  const description=companion?connected?"文字與巨集工具正在管理連線。":"用 USB 資料線接上 KeyNest，工具會自動找到鍵盤。":supported?"用 USB 資料線接上 KeyNest，再按下方按鈕選擇裝置。":"USB 連接需要電腦版 Chrome 或 Edge。也可以先試用介面。";
   const note=error||inputIssue||(working?"正在讀取鍵盤設定…":connected?companion?"切到想操作的程式，再按實體鍵即可。":"連接成功，可以開始設定你的按鍵。":companion?"若其他網站或串列監控正連接鍵盤，請先中斷那邊的連線。":"設定完成後會保存在鍵盤，拔掉再插上也會保留。");
   return {title,description,keyboard,macro,macroReady:macroReady&&!inputIssue,note,issue:!!(error||inputIssue),choose:working?"正在連接…":companion?"重新檢查鍵盤":connected?"更換裝置":"連接鍵盤",hideChoose:connected};
 }

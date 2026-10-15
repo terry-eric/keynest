@@ -2,11 +2,27 @@
 
 這個應用使用專案的 `pcb2_board` component，整合 USB HID 鍵盤、四顆 RGB LED、自訂按鍵音、麥克風音量與 WAV 錄音。Web App 直接放在韌體中，由 ESP32-S3 提供；連到裝置 Wi-Fi 即可操作，無需網際網路或 SD 卡。
 
-v10 改為單一[雲端控制台](https://demo.terry878.org/pcb2/)透過 USB 設定板子，不需安裝或啟動本機背景工具。快捷鍵、最多 16 鍵的組合、媒體鍵、英文文字和 16 步巨集由 ESP32-S3 自行執行，設定保存後可關閉網站。中文依系統輸入方式提供 Linux／macOS 選項；Windows 尚無適用所有軟體的免工具中文模式，詳見下方限制。每鍵音效、平滑混音與 10 分鐘錄音沿用 v9。
+v10 改為單一[雲端控制台](https://demo.terry878.org/keynest/)透過 USB 設定板子，不需安裝或啟動本機背景工具。快捷鍵、最多 16 鍵的組合、媒體鍵、英文文字和 16 步巨集由 ESP32-S3 自行執行，設定保存後可關閉網站。中文依系統輸入方式提供 Linux／macOS 選項；Windows 尚無適用所有軟體的免工具中文模式，詳見下方限制。每鍵音效、平滑混音與 10 分鐘錄音沿用 v9。
 
 目前已完成 ESP-IDF 5.5.0 交叉編譯與軟體驗證。2026-10-13 USB 診斷版已燒錄並核對，實測網頁控制、左右 slot 切換、即時 PCM 波形與免 SD 的 WAV 串流；人聲收音品質尚未通過。實機結果見 [VALIDATION.md](VALIDATION.md)。接腳沿用 2026-09-19 EasyEDA 保存快照，詳細對照見 [board library](../README.md)。
 
 **實際麥克風為 ZTS6672**（使用者於 2026-10-13 確認）。規格書的 CONFIG-open／SELECT-low 表格寫右聲道，但本板右 slot 實測全零；目前預設讀有資料的左 slot，收音品質仍待確認。`menuconfig → PCB2 board` 可選型號及開機聲道，網頁「收音聲道診斷」可在停止錄音後暫時切換，重啟恢復預設。`/api/state` 的 `mic_model` 是建置標示，`mic_slot` 是目前選擇；`mic_slots` 是最近 DMA block 的雙聲道原始統計。
+
+## v11：短按、長按與雙擊
+
+v11 保留 v10 的板上執行及所有分割區，新增 `/api/state.macros.gestures:1` 能力宣告；macro API 的 version 仍為 1。原有 `{name,steps,text_mode?}` 可直接讀取，不用搬移 NVS。需特殊按法的 program 可增加：
+
+```json
+{"name":"複製","steps":[{"type":"hid","code":6,"modifiers":1}],"gestures":{"hold_ms":600,"double_ms":300,"hold":{"name":"全選","steps":[{"type":"keys","keys":["CTRL","A"]}]},"double":{"name":"貼上","steps":[{"type":"keys","keys":["CTRL","V"]}]}}}
+```
+
+`hold`／`double` 為獨立 program 或 null；至少一個非 null，子動作不可再有 gestures。每個動作最多 16 步，整份含三種按法共用 1200 bytes。新增內部 `hid` 步驟（code=0 或 4–115，modifiers=0–255），保留完整左右修飾鍵及數字鍵盤，不需把 HID usage 轉成文字名稱。
+
+`key_gestures.c` 使用去抖後的實體按鍵與單調時鐘：沒有特殊按法時沿用按下緣；長按到門檻觸發一次，放開不補短按；有雙擊時第一個短按等間隔結束再執行，第二次按下在間隔內且放開便執行雙擊。第二下改為長按時，只執行長按。長按門檻 300–2000ms，雙擊間隔 150–600ms。每鍵獨立計時；一次仍只執行一個巨集，忙碌略過、不排隊。
+
+設定更新、USB 斷線／暫停與一般實體輸入會清除等待中的判定；重新連線時已按住的鍵需先放開再按，避免補送過期動作。執行中的 program 維持獨立 snapshot；更新 NVS 不會改動已開始的步驟。一般 raw 單鍵／快捷鍵在未啟用特殊按法時維持即時按下與放開；啟用時明確轉為點按輸出。
+
+新版只需更新 0x10000 app，保留 NVS、音訊、bootloader 與 v9 分割表。v11 的產物、軟體與實板證據分開記在 VALIDATION.md，不沿用 v10 的實測結果。
 
 ## 編譯、燒錄與開啟
 

@@ -1,3 +1,15 @@
+# KeyNest v11 驗證紀錄
+
+2026-10-16，ESP-IDF 5.5.0／PlatformIO 6.2.0。此節只記錄 v11，不把 v10 的實板結果套用到新映像。
+
+- ESP32-S3 編譯成功，程式區佔用約 53%、靜態 RAM 約 23%，分割表與 v10 相同。產物及 76 份來源的精確 SHA-256 記在 manifest。
+- 真實 C store／engine／USB tick 的主機測試通過：舊 program 相容、左右修飾鍵與 raw HID 點按、長按／雙擊 schema、範圍與巢狀拒絕、NVS 重載、寫入失敗保留、獨立 snapshot、keyboard／consumer 放鍵及背壓。
+- 新增手勢測試：四鍵獨立、600ms 長按門檻與 300ms 雙擊間隔邊界、只有長按／只有雙擊、短按等待、雙擊不送短按、第二次長按只送長按、持續按住不連發、斷線不補送、一般鍵中斷等待、分開 Ctrl／A 並獨立放鍵。測試使用模擬時鐘與 HID，不向使用者程式打字。
+- 公開介面操作：在展示模式從總表指定第 1 鍵 Ctrl、第 2 鍵 A、第 3 鍵長按全選／雙擊開啟記事本；四鍵摘要與草稿數更新，保存回饋成功，按鍵編輯器讀到各自的按法。這是 UI 驗證，沒有把展示模式當實板輸入證據。
+- Node／Python：28 個總表動作及 Windows 引號路徑、嚴格拒絕額外參數、巨集範例、特殊按法容量／範圍／獨立複製、連線能力、Web Serial CRC／owner／取消／有限重送、WAV 及音效裁切、USB 14 項、接腳與公開網站建置檢查通過。
+- Cloudflare `/keynest/` 與相容 `/pcb2/` 的 22 個公開檔案逐一核對，USB／安全標頭正確，同網域 Roomly、Trip 與 KeyNest 八條路由核對；GSAP 動畫保留。GitHub repository 改名為 `terry-eric/keynest`。
+- v11 燒錄及原資料保存正在另行驗證；尚未宣稱實體長按／雙擊、Windows 開程式或跨平台文字輸入已實測。既有麥克風人聲、SD 與音效品質限制仍適用。
+
 # PCB2 Keypad v10 公開驗證摘要
 
 2026-10-15，`keypad-studio-v10`，ESP-IDF 5.5.0／PlatformIO 6.2.0。實板 app SHA-256：`e9341d6e3176303b901eaccc1f1cf82eac6206fd8f80fb4236c77c060110222a`。本節只列 v10 本次證據；音訊品質與 10 分鐘錄音的歷史結果見 v9。

@@ -33,6 +33,7 @@ def studio_html(ui, extra):
     board, mic, light, sound, mapping, recording = sections
     board = board.replace('data-trigger=', 'data-edit-key=')
     for key in range(4): board = board.replace(f'aria-label="測試 KEY{key+1} 的 LED 與音效"', f'aria-label="設定第 {key+1} 顆鍵"')
+    board = board.replace("PCB2 / S3", "KEYNEST / S3")
     board = board.replace("鍵盤預覽", "選擇要設定的按鍵")
     board = re.sub(r'<p class="caption">.*?</p>', '', board, count=1)
     mapping = mapping[mapping.index('<div class="mapping-header">'):mapping.index('<div class="apply-row">')]
@@ -64,14 +65,19 @@ def build(output, base_path="pcb2"):
     # Supply the USB fetch implementation lexically; retain the entire maintained UI.
     app = (ui / "app.js").read_text(encoding="utf-8")
     (destination / "app.js").write_text('(function(fetch) {\n' + app + '\n})((...args) => window.PCB2Transport.fetch(...args));\n', encoding="utf-8", newline="\n")
-    files = {"style.css":ui / "style.css", "gsap.min.js":extra / "vendor/gsap.min.js", **{name:extra / name for name in ("usb-serial.js", "usb-connect.js", "usb-connect.css", "studio.js", "studio.css")}}
+    files = {"style.css":ui / "style.css", "gsap.min.js":extra / "vendor/gsap.min.js", **{name:extra / name for name in ("usb-serial.js", "usb-connect.js", "usb-connect.css", "studio.js", "studio.css", "actions.js")}}
     # Remove the retired helper asset from an existing output directory.
     (destination / "companion.js").unlink(missing_ok=True)
     for name, source in files.items():
         (destination / name).write_bytes(source.read_bytes())
-    (output / "_headers").write_text('/' + base_path + '/*\n  Permissions-Policy: serial=(self)\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Content-Security-Policy: default-src \'self\'; script-src \'self\' https://static.cloudflareinsights.com; style-src \'self\' \'unsafe-inline\'; media-src \'self\' blob:; img-src \'self\' data:; connect-src \'self\' https://cloudflareinsights.com; object-src \'none\'; base-uri \'self\'; frame-ancestors \'none\'\n', encoding="utf-8", newline="\n")
+    headers = output / "_headers"
+    prefix = '/' + base_path + '/*'
+    blocks = headers.read_text(encoding="utf-8").strip().split('\n\n') if headers.exists() else []
+    blocks = [block for block in blocks if block and block.splitlines()[0] != prefix]
+    blocks.append(prefix + '\n  Permissions-Policy: serial=(self)\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Content-Security-Policy: default-src \'self\'; script-src \'self\' https://static.cloudflareinsights.com; style-src \'self\' \'unsafe-inline\'; media-src \'self\' blob:; img-src \'self\' data:; connect-src \'self\' https://cloudflareinsights.com; object-src \'none\'; base-uri \'self\'; frame-ancestors \'none\'')
+    headers.write_text('\n\n'.join(blocks) + '\n', encoding="utf-8", newline="\n")
     metadata = {"source":"firmware/keyboard/main/web", "base_path":"/" + base_path + "/",
-                "studio_version":7,
+                "studio_version":9,
                 "ui_sha256":{name:hashlib.sha256((ui / name).read_bytes()).hexdigest() for name in ("index.html", "app.js", "style.css")}}
     (destination / "build-info.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8", newline="\n")
     return destination
@@ -80,6 +86,7 @@ def build(output, base_path="pcb2"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=ROOT / "dist-web")
-    parser.add_argument("--base-path", default="pcb2")
+    parser.add_argument("--base-path", help="Build one path; otherwise build keynest and the pcb2 compatibility entry")
     args = parser.parse_args()
-    print("Hosted USB console: " + str(build(args.out.resolve(), args.base_path)))
+    for base_path in ([args.base_path] if args.base_path else ["pcb2", "keynest"]):
+        print("Hosted USB console: " + str(build(args.out.resolve(), base_path)))

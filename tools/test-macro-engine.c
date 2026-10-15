@@ -29,5 +29,6 @@ int main(void){
  const unsigned mac[]={33,8,31,7};
  for(unsigned i=0;i<4;i++){assert(next(false));assert(key(mac[i])&&frame.modifiers==4);assert(next(false));assert(frame.modifiers==(i<3?4:0));for(unsigned j=0;j<28;j++)assert(!frame.keys[j]);}assert(!next(false));
  assert(!strcmp(start("{\"name\":\"\",\"text_mode\":\"macos\",\"steps\":[{\"type\":\"text\",\"text\":\"中😀\"}]}"),"macos_bmp_only"));
+ assert(!start("{\"name\":\"\",\"steps\":[{\"type\":\"hid\",\"code\":4,\"modifiers\":128}]}"));assert(next(false)&&key(4)&&frame.modifiers==128);released();assert(!next(false));
  cJSON_Delete(program);puts("PASS: real macro engine 16-key NKRO, all media bits, ASCII/punctuation, Caps Lock, waits, Linux Unicode, macOS modifier holds, full-action preflight");return 0;
 }
