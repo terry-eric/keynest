@@ -8,7 +8,9 @@
 - 公開介面操作：在展示模式從總表指定第 1 鍵 Ctrl、第 2 鍵 A、第 3 鍵長按全選／雙擊開啟記事本；四鍵摘要與草稿數更新，保存回饋成功，按鍵編輯器讀到各自的按法。這是 UI 驗證，沒有把展示模式當實板輸入證據。
 - Node／Python：28 個總表動作及 Windows 引號路徑、嚴格拒絕額外參數、巨集範例、特殊按法容量／範圍／獨立複製、連線能力、Web Serial CRC／owner／取消／有限重送、WAV 及音效裁切、USB 14 項、接腳與公開網站建置檢查通過。
 - Cloudflare `/keynest/` 與相容 `/pcb2/` 的 22 個公開檔案逐一核對，USB／安全標頭正確，同網域 Roomly、Trip 與 KeyNest 八條路由核對；GSAP 動畫保留。GitHub repository 改名為 `terry-eric/keynest`。
-- v11 燒錄及原資料保存正在另行驗證；尚未宣稱實體長按／雙擊、Windows 開程式或跨平台文字輸入已實測。既有麥克風人聲、SD 與音效品質限制仍適用。
+- 實板完整 4 MB 私人備份核對原 v10 app／分割表後，只寫入 0x10000 app（1,106,032 bytes，SHA-256 `8e69c1d06745fc44c98b4f70f453229b378d12229158d6390d8b7cbb175e9bb8`），獨立 verify_flash 通過。0x000000–0x00FFFF 的 bootloader／分割表／NVS／PHY，及 0x210000–0x38FFFF 的全部已存音訊，更新前後逐 byte 一致；新建置的 bootloader 產物沒有寫入實板。
+- 自動重啟後，USB CDC 重新枚舉，回報 execution=device、gestures=1，原 config 與四份 program 完整相同。新特殊按法預設未啟用，沒有覆寫使用者原動作。除錯 ELF 私存；公開 ELF 去除 debug 資訊，實際 firmware.bin 雜湊不變。
+- GitHub Pages 在改名後的 `/keynest/` 發布成功，11 個公開檔案與同版 Cloudflare 建置一致。實體長按／雙擊、Windows 開程式或跨平台文字輸入仍待使用者測試；既有麥克風人聲、SD 與音效品質限制仍適用。
 
 # PCB2 Keypad v10 公開驗證摘要
 
