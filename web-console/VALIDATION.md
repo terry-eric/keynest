@@ -1,3 +1,12 @@
+# KeyNest 單一網址：2026-10-16
+
+- 正式控制台統一為 `https://demo.terry878.org/keynest/`。Cloudflare 發布版本 `bcc00dd1-de0a-47b8-861b-43e12fa4570b`；11 個正式資源與本機建置逐檔一致，USB 安全標頭保留。
+- 移除 `demo.terry878.org/pcb2` 與 `/pcb2/*` 兩條路由，以及舊的公開資源。路由 API 與變更前快照核對，只少這兩條；Roomly、Trip、Workboard 與其他服務設定皆一致。
+- 舊自訂網址目前由主網站原有預設處理回傳作品花園首頁（HTTP 200），已沒有鍵盤控制台 HTML／USB JavaScript；直接查詢這個 Worker 的 `/pcb2/`、`/pcb2/studio.js` 均回覆 404。沒有為了移除鍵盤入口去修改主網站的預設處理。
+- 建置預設只產生 `keynest/`，清理舊的已知產物與標頭，並以 `.assetsignore` 排除 `pcb2/`。測試確認遇到未知檔案不會刪除，輸出路徑必須符合指定目錄。
+- GitHub repository 網站欄位改為 Cloudflare 正式網址。Pages 工作流程只上傳固定轉址頁；本機驗證只有 index.html，refresh、canonical 與手動連結均指向同一網址，沒有 USB 控制程式。
+- 本次未修改或燒錄韌體，原 76 份韌體相關來源雜湊保持一致。
+
 # 公開 USB 控制台 v5 驗證
 
 2026-10-15 v5 動畫：新增 GSAP 進場、分頁、選鍵彈跳、設定區切換、展開內容、步驟新增／重排與儲存完成回饋。瀏覽器實際量測分頁與鍵帽的 transform／opacity 在操作後變化，並確認關閉動畫後恢復正常位置與不透明度。動畫開關偏好重新載入後保留；純函式測試涵蓋系統 reduced-motion 與明確開啟／關閉的優先順序。動畫 context 按操作覆用並於停用／離頁時清理，內容不依賴動畫才能顯示。

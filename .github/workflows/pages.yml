@@ -42,9 +42,9 @@ jobs:
           node tools/test-studio.cjs
           node tools/test-connection-view.cjs
           node tools/test-web-serial.cjs
-      - name: Build the same USB console for the repository URL
-        run: python tools/build-web-console.py --out .tools/github-pages --base-path keynest
-      - name: Upload only the public console assets
+      - name: Build the redirect to the Cloudflare console
+        run: python tools/build-web-console.py --out .tools/github-pages --pages-redirect
+      - name: Upload only the public redirect page
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
           path: .tools/github-pages/keynest

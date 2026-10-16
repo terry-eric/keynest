@@ -7,6 +7,34 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PUBLIC_FILES = {"index.html", "app.js", "style.css", "usb-serial.js", "usb-connect.js", "usb-connect.css", "studio.js", "studio.css", "actions.js", "build-info.json", "gsap.min.js"}
+
+
+def clear_generated_entry(output, name):
+    """Remove only known build files directly inside the expected output folder."""
+    output = output.resolve()
+    entry = output / name
+    if entry.is_symlink() or entry.resolve() != output / name:
+        raise ValueError("Generated entry must not be a linked directory")
+    if not entry.exists(): return
+    if not entry.is_dir():
+        raise ValueError("Generated entry escapes the output directory")
+    files = list(entry.iterdir())
+    if any(not path.is_file() or path.is_symlink() or path.name not in PUBLIC_FILES | {"companion.js"} for path in files):
+        raise ValueError("Unexpected files in generated entry; preserve them before rebuilding")
+    for path in files: path.unlink()
+    entry.rmdir()
+
+
+def build_pages_redirect(output):
+    if output.resolve() == (ROOT / "dist-web").resolve():
+        raise ValueError("Pages redirect needs a separate output directory")
+    clear_generated_entry(output, "keynest")
+    destination = output / "keynest"
+    destination.mkdir(parents=True, exist_ok=True)
+    source = (ROOT / "web-console/pages-redirect.html").read_text(encoding="utf-8")
+    (destination / "index.html").write_text(source, encoding="utf-8", newline="\n")
+    return destination
 
 class Panels(HTMLParser):
     """Retain maintained feature sections, replacing only hosted navigation."""
@@ -53,9 +81,12 @@ def studio_html(ui, extra):
     return html
 
 
-def build(output, base_path="pcb2"):
+def build(output, base_path="keynest"):
     if not base_path or any(part in ("", ".", "..") for part in base_path.split("/")) or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-/" for c in base_path):
         raise ValueError("Use a relative lowercase base path")
+    if base_path == "keynest": clear_generated_entry(output, "pcb2")
+    output.mkdir(parents=True, exist_ok=True)
+    (output / ".assetsignore").write_text("/pcb2/\n", encoding="utf-8", newline="\n")
     destination = output / base_path
     destination.mkdir(parents=True, exist_ok=True)
     ui = ROOT / "firmware/keyboard/main/web"
@@ -73,7 +104,7 @@ def build(output, base_path="pcb2"):
     headers = output / "_headers"
     prefix = '/' + base_path + '/*'
     blocks = headers.read_text(encoding="utf-8").strip().split('\n\n') if headers.exists() else []
-    blocks = [block for block in blocks if block and block.splitlines()[0] != prefix]
+    blocks = [block for block in blocks if block and block.splitlines()[0] not in {prefix, "/pcb2/*"}]
     blocks.append(prefix + '\n  Permissions-Policy: serial=(self)\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Content-Security-Policy: default-src \'self\'; script-src \'self\' https://static.cloudflareinsights.com; style-src \'self\' \'unsafe-inline\'; media-src \'self\' blob:; img-src \'self\' data:; connect-src \'self\' https://cloudflareinsights.com; object-src \'none\'; base-uri \'self\'; frame-ancestors \'none\'')
     headers.write_text('\n\n'.join(blocks) + '\n', encoding="utf-8", newline="\n")
     metadata = {"source":"firmware/keyboard/main/web", "base_path":"/" + base_path + "/",
@@ -86,7 +117,10 @@ def build(output, base_path="pcb2"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=ROOT / "dist-web")
-    parser.add_argument("--base-path", help="Build one path; otherwise build keynest and the pcb2 compatibility entry")
+    parser.add_argument("--base-path", default="keynest", help="Build a relative path; production uses keynest")
+    parser.add_argument("--pages-redirect", action="store_true", help="Build the GitHub Pages redirect to the Cloudflare console")
     args = parser.parse_args()
-    for base_path in ([args.base_path] if args.base_path else ["pcb2", "keynest"]):
-        print("Hosted USB console: " + str(build(args.out.resolve(), base_path)))
+    if args.pages_redirect:
+        print("Pages redirect: " + str(build_pages_redirect(args.out.resolve())))
+    else:
+        print("Hosted USB console: " + str(build(args.out.resolve(), args.base_path)))

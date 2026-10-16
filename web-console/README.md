@@ -4,7 +4,7 @@
 
 維持 `firmware/keyboard/main/web/app.js` 的音效、錄音與普通快捷鍵行為，建置時重用其功能面板與 control IDs；新的 `studio.js` 負責分頁、快捷鍵擷取與巨集編輯。v8 加入獨立 NVS 巨集保存和實體鍵事件，不改分割區、原設定 blob、Flash 錄音或按鍵音儲存區。
 
-網址：[GitHub Pages](https://terry-eric.github.io/keynest/) 與 [Cloudflare](https://demo.terry878.org/keynest/)，兩者使用同一套控制介面。Cloudflare Worker 服務 `/keynest`、`/keynest/*`，並保留 `/pcb2` 舊入口，保留同網域的 `/roomly`、`/trip`。
+唯一正式網址：[KeyNest 控制台](https://demo.terry878.org/keynest/)。GitHub 專案網站連結與原 [GitHub Pages](https://terry-eric.github.io/keynest/) 均導向此網址。Cloudflare Worker 只服務 `/keynest`、`/keynest/*`，已移除 `/pcb2`、`/pcb2/*` 舊路由及資源；同網域 `/roomly`、`/trip` 維持原服務。
 
 使用電腦版 Chrome 或 Edge，以 USB 資料線連接已燒錄支援 PCB2 RPC 的板子。第一次按「連接鍵盤」，授權執行中 VID 303A／PID 4005 的裝置。之後可手動選擇已授權裝置，或自動連接唯一的已授權裝置；多個候選不會任意選擇。ROM PID 1001 不用於控制。正式控制台只有 Web Serial 直連，不提供本機工具／另一個控制台的切換入口，也不載入 companion.js。
 
@@ -20,7 +20,7 @@ v9 音效頁可選第 1～4 顆鍵，各自上傳／裁切最多 2 秒音檔，�
 
 ## KeyNest：單鍵、動作總表與更多按法
 
-公開網站已改名 KeyNest，GitHub repository 為 `terry-eric/keynest`，Pages 網址為 <https://terry-eric.github.io/keynest/>，Cloudflare 為 <https://demo.terry878.org/keynest/>。Cloudflare `/pcb2/` 舊入口繼續提供同一套介面；舊的 GitHub Pages 專案網址不會隨 repository 改名自動轉址。
+公開網站已改名 KeyNest，GitHub repository 為 `terry-eric/keynest`，正式網址為 <https://demo.terry878.org/keynest/>，原 Pages 網址轉到同一處。Cloudflare `/pcb2/` 舊入口已移除；舊的 GitHub Pages 專案網址不會隨 repository 改名自動轉址。
 
 - **單鍵**：可選 A、Enter 或獨立的左右 Ctrl／Shift／Alt／Win。未啟用特殊按法時，按下維持、放開釋放；例如第 1 鍵 Ctrl、第 2 鍵 A，可合成 Ctrl+A。
 - **動作總表**：28 個單鍵、快捷鍵、連續動作範例、Windows 程式與媒體動作。可以搜尋／分類，選第幾顆與短按／長按／雙擊，連續安排多顆，最後一次儲存；離線也能瀏覽。
@@ -48,7 +48,7 @@ npx wrangler@4.151.0 deploy
 
 `dist-web/` 是可再生成的唯一部署目錄，沒有備份、錄音、MCU 識別碼或 Cloudflare 憑證。`wrangler.jsonc` 使用既有 Cloudflare OAuth／環境設定，請勿把登入憑證放入 repository。另可將 `dist-web` 上傳到其他靜態 HTTPS 主機。
 
-本機測試：`python -m http.server 8032 --bind 127.0.0.1 --directory dist-web`，開啟 `http://127.0.0.1:8032/pcb2/`。`?demo=1` 才會顯示合成資料，展示模式不會連接 USB。
+本機測試：`python -m http.server 8032 --bind 127.0.0.1 --directory dist-web`，開啟 `http://127.0.0.1:8032/keynest/`。`?demo=1` 才會顯示合成資料，展示模式不會連接 USB。
 
 `test-macro-store.py` 使用已下載的 ESP-IDF cJSON 和 `.tools/tcc` 的 Windows host compiler。C 邏輯以實際來源編譯，替代 NVS、時鐘與鎖；其他平台可沿用同一測試 C 檔搭配自己的 host compiler。
 
@@ -64,10 +64,10 @@ HID 使用 report 1：8 個修飾鍵與 224-bit NKRO bitmap；report 2：6 個�
 
 `/api/state.macros` 保留 version 1 與 enabled，新增 `execution:"device"`、busy、completed、failed、dropped、last_key、result。舊 host／ack lease API 回覆 invalid state，event API 無事件，避免舊背景程式重複輸入。網頁 `/api/trigger` 仍然只測試 LED／音效，不能遠端觸發電腦輸入。NVS namespace、設定 blob、Flash 錄音、每鍵音效與 v9 分割表不變；從 v9 只更新 0x10000 app。
 
-## GitHub Pages 發布
+## GitHub Pages 轉址
 
-`.github/workflows/pages.yml` 在 main 的介面或部署來源更新時，自動檢查、建置並發布同一套 USB 控制台，也能在 Actions 手動執行。網站直接開在 repository 路徑，不用再加 `/pcb2/`；所有 CSS／JavaScript 使用相對網址。建置與部署由 GitHub 執行，日常操作不需本機服務。
+`.github/workflows/pages.yml` 在 main 的介面或部署來源更新時，自動檢查並發布轉址頁，也能在 Actions 手動執行。原 `https://terry-eric.github.io/keynest/` 透過 HTML refresh 與明確的連結轉到 `https://demo.terry878.org/keynest/`，不再另外提供一個 USB 控制台。GitHub repository 的網站連結也使用 Cloudflare 網址。
 
-部署只上傳 `.tools/github-pages/keynest/` 的 11 個公開檔案，不包含專案來源、韌體備份或錄音。Cloudflare 的路由與自訂網域不變；不為 GitHub Pages 設定 CNAME。公開網站的 `/api/*` 都轉成瀏覽器 USB RPC，不需要 GitHub 伺服器提供 API。
+`python tools/build-web-console.py` 預設只產生 Cloudflare 的 `dist-web/keynest/`，並移除舊的已知 `/pcb2/` 產物與標頭；若舊目錄包含非建置檔案或指向輸出目錄外則拒絕清理。`.assetsignore` 另排除 `pcb2/`，避免舊資源被誤上傳。
 
-GitHub Pages 與 Cloudflare 是不同網站，USB 授權依網站分開。第一次使用 Pages 時，請先在原網站按「連線設定 → 鍵盤沒有出現？→ 中斷連接」，再在 Pages 按「連接鍵盤」授權同一塊板子。不要同時開兩邊連接 USB。
+GitHub Actions 使用 `python tools/build-web-console.py --out .tools/github-pages --pages-redirect`，只上傳 `.tools/github-pages/keynest/index.html`。轉址輸出須和 Cloudflare 輸出分開；不包含韌體、錄音或 USB JavaScript，也不為整個 `demo.terry878.org` 設定 Pages CNAME。Cloudflare 的控制資料仍直接經瀏覽器 USB 傳送。

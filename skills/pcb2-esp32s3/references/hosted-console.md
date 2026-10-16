@@ -1,8 +1,8 @@
 # 公開控制台與瀏覽器 USB
 
-`web-console/` 與 `tools/build-web-console.py` 重用 firmware 的功能面板／control IDs 與完整 app.js，產生 `dist-web/keynest/` 與相容的 `dist-web/pcb2/`。`studio.html`／`studio.css`／`studio.js` 提供四個工作分頁、點鍵編輯、快捷鍵擷取與巨集編輯；原始 app.js 透過函式參數呼叫動態 transport。修改來源後重新建置，不手動維護 dist 副本。
+`web-console/` 與 `tools/build-web-console.py` 重用 firmware 的功能面板／control IDs 與完整 app.js，僅產生正式入口 `dist-web/keynest/`。`studio.html`／`studio.css`／`studio.js` 提供四個工作分頁、點鍵編輯、快捷鍵擷取與巨集編輯；原始 app.js 透過函式參數呼叫動態 transport。修改來源後重新建置，不手動維護 dist 副本。建置會清理已知舊入口產物，遇到未知檔案或目錄外連結時拒絕刪除。
 
-正式網址 `https://demo.terry878.org/keynest/`，Cloudflare Worker `pcb2-keypad-console` 的 `wrangler.jsonc` 使用 `/keynest` 與 `/keynest/*`，另保留 `/pcb2` 舊入口；同網域有 Roomly 與 Trip 服務，不要為此任務改它們的路由或覆寫整個網域。
+正式網址 `https://demo.terry878.org/keynest/`，Cloudflare Worker `pcb2-keypad-console` 的 `wrangler.jsonc` 使用 `/keynest` 與 `/keynest/*`，`/pcb2` 舊入口已移除；GitHub Pages 只轉到 Cloudflare 正式網址；同網域有 Roomly 與 Trip 服務，不要為此任務改它們的路由或覆寫整個網域。
 
 Web Serial 需要 HTTPS／localhost 與支援的桌面瀏覽器。首次 `requestPort()` 必須由使用者操作；`getPorts()` 只能取得這個網站已授權的裝置。自動連接只用唯一的 VID 303A／PID 4005 候選，再以 PCB2 state／protocol handshake 核對。多個候選由使用者選擇，不透過瀏覽器內部 API 繞過授權。
 

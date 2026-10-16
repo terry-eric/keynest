@@ -10,7 +10,12 @@ cache = root / ".tools"
 cache.mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory(prefix="pcb2-web-build-", dir=cache) as temporary:
     assert Path(temporary).resolve().is_relative_to(cache.resolve())
-    destination = module.build(Path(temporary))
+    output = Path(temporary)
+    retired = module.build(output, "pcb2")
+    assert retired.is_dir(), "Seed the previous deployment output"
+    destination = module.build(output)
+    assert destination.name == "keynest" and not retired.exists(), "Production must remove the retired entry"
+    assert "/pcb2/" in (output / ".assetsignore").read_text()
     html = (destination / "index.html").read_text(encoding="utf-8")
     app = (destination / "app.js").read_text(encoding="utf-8")
     original = (root / "firmware/keyboard/main/web/app.js").read_text(encoding="utf-8")
@@ -30,26 +35,47 @@ with tempfile.TemporaryDirectory(prefix="pcb2-web-build-", dir=cache) as tempora
     assert 'id="page-keys"' in html and 'id="page-effects"' in html and 'id="page-audio"' in html
     assert html.count('data-edit-key=')==4 and html.count('data-trigger=')==4
     assert "serial=(self)" in (Path(temporary) / "_headers").read_text(encoding="utf-8")
-    # GitHub Pages mounts the artifact directly at the repository URL, not /pcb2/.
+    # GitHub Pages publishes only a fixed redirect; USB stays on the Cloudflare origin.
     import json
     from urllib.parse import urljoin
-    pages = module.build(Path(temporary), "keynest")
-    pages_html = (pages / "index.html").read_text(encoding="utf-8")
-    assert pages_html == html
-    assert {p.name for p in pages.iterdir()} == files
-    for name in files - {"build-info.json"}:
-        assert (pages / name).read_bytes() == (destination / name).read_bytes(), name
-    assert json.loads((pages / "build-info.json").read_text())["base_path"] == "/keynest/"
-    headers = (Path(temporary) / "_headers").read_text()
-    assert '/pcb2/*' in headers and '/keynest/*' in headers
-    page_url = "https://terry-eric.github.io/keynest/"
-    for asset in re.findall(r'(?:src|href)="(\./[^"?]+)"', pages_html):
-        assert (pages / asset[2:]).is_file(), asset
+    pages_output = output / "github-pages"
+    module.build(pages_output)  # Simulate upgrading an existing Pages console artifact.
+    pages = module.build_pages_redirect(pages_output)
+    assert {p.name for p in pages.iterdir()} == {"index.html"}
+    redirect_html = (pages / "index.html").read_text(encoding="utf-8")
+    target = "https://demo.terry878.org/keynest/"
+    assert f'content="0;url={target}"' in redirect_html
+    assert f'rel="canonical" href="{target}"' in redirect_html
+    assert f'<a href="{target}">' in redirect_html
+    assert "usb-serial.js" not in redirect_html and "<script" not in redirect_html
+    headers = (output / "_headers").read_text()
+    assert '/pcb2/*' not in headers and '/keynest/*' in headers
+    assert json.loads((destination / "build-info.json").read_text())["base_path"] == "/keynest/"
+    page_url = target
+    for asset in re.findall(r'(?:src|href)="(\./[^"?]+)"', html):
+        assert (destination / asset[2:]).is_file(), asset
         assert urljoin(page_url, asset).startswith(page_url)
+    routes = json.loads((root / "wrangler.jsonc").read_text())["routes"]
+    assert {r["pattern"] for r in routes} == {"demo.terry878.org/keynest", "demo.terry878.org/keynest/*"}
+    # Never remove user files when cleaning an older generated entry.
+    retired.mkdir()
+    unknown = retired / "keep.txt"
+    unknown.write_text("preserve")
+    try:
+        module.build(output)
+        raise AssertionError("Unexpected files in a retired entry were deleted")
+    except ValueError:
+        assert unknown.read_text() == "preserve"
+    unknown.unlink(); retired.rmdir()
+    try:
+        module.build_pages_redirect(root / "dist-web")
+        raise AssertionError("Redirect overwrote the Cloudflare output")
+    except ValueError:
+        pass
     for invalid in ("../outside", "/", "", "pcb2/../outside"):
         try:
             module.build(Path(temporary), invalid)
             raise AssertionError("Unsafe base path accepted")
         except ValueError:
             pass
-print("PASS: maintained controls, Cloudflare/Pages identical assets, repository-relative links, asset allowlist and safe paths")
+print("PASS: maintained controls, fixed Pages redirect, KeyNest-only routes/assets, safe legacy cleanup and relative links")

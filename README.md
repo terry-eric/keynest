@@ -8,7 +8,9 @@
 - ZTS6672 麥克風即時音量、PCM 波形、直流偏移診斷、數位增益與 WAV 錄音；可選 ICS-43434 建置設定。
 - Web App 由雲端網站提供，瀏覽器直接透過 USB 設定板子，日常不用本機背景工具；亦保留裝置 Wi-Fi 頁面。
 
-公開的 [GitHub Pages 控制台](https://terry-eric.github.io/keynest/) 與 [Cloudflare 控制台](https://demo.terry878.org/keynest/) 以選鍵、設定動作、儲存為入口，燈光音效與收音錄音分頁操作。電腦版 Chrome／Edge 可直接連接 USB；普通快捷鍵支援按下擷取與常用預設。錄音與控制資料在瀏覽器與 PCB 之間傳送；詳見 [網頁 USB 控制台](web-console/README.md)。
+公開的 [KeyNest 控制台](https://demo.terry878.org/keynest/) 以選鍵、設定動作、儲存為入口，燈光音效與收音錄音分頁操作。電腦版 Chrome／Edge 可直接連接 USB；普通快捷鍵支援按下擷取與常用預設。錄音與控制資料在瀏覽器與 PCB 之間傳送；詳見 [網頁 USB 控制台](web-console/README.md)。
+
+GitHub 專案的網站連結與原 [GitHub Pages 網址](https://terry-eric.github.io/keynest/) 統一導向 Cloudflare 正式網址；Cloudflare 舊 `/pcb2/` 入口已移除。
 
 v11 新增每鍵獨立的長按與雙擊，搭配「動作總表」直接指派。未啟用特殊按法的單鍵保留按住／放開，支援分開的 Ctrl 和 A。亦提供可編輯的連續動作範例，以及 Windows 開啟程式功能；詳見[KeyNest 操作說明](web-console/README.md#keynest單鍵動作總表與更多按法)。
 
